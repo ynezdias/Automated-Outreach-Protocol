@@ -194,3 +194,47 @@ Audit records are immutable and cannot be shortened or deleted even by the root
 account until retention lapses — 7 years is a floor, so miswritten objects also
 persist. Consumers must address the audit bucket by its own name/ARN rather than
 a prefix on the data bucket.
+
+## ADR-009: Suppression list design — append-only S3 event log, fail-closed checks
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The suppression list is a compliance control: an opt-out recorded anywhere must
+be queryable within 60 seconds, suppression is cross-channel, and normalization
+must be identical to the cleansing pipeline. S3 objects cannot be appended to,
+and several conventional tool choices (pyarrow, moto→cryptography) ship no
+Windows-ARM64 wheels, which our dev machines require.
+
+### Decision
+
+- **Source of truth** is an append-only event log: one immutable JSON object per
+  suppression event under `suppression/events/<uuid>.json`. Unique keys make
+  concurrent writes lossless. The Parquet snapshot
+  (`suppression/optout/current.parquet`) and the in-memory query cache are
+  derived and always rebuildable from the log.
+- **Freshness**: reads go through a cache with a 30-second TTL (constant
+  `REFRESH_TTL_SECONDS`, test-asserted `< 60`). Writers see their own writes
+  immediately.
+- **Fail-closed**: a provided identifier that cannot be normalized is reported
+  as suppressed (`indeterminate_identifiers`); a query with no identifiers
+  raises. `add_suppression` raises on unnormalizable input so the opt-out routes
+  to a human instead of being silently dropped.
+- **Shared normalization** lives in `src/cleansing/normalize.py` (E.164 via
+  phonenumbers; emails NFKC-folded, casefolded, zero-width-stripped, and
+  plus-address tags removed — over-suppression is safe, under-suppression is a
+  violation).
+- **Earliest opt-out wins** when an identifier has multiple events.
+- **Tooling substitutions**: polars writes/reads Parquet (pyarrow has no
+  win-arm64 wheel); tests inject a minimal in-memory fake S3 client instead of
+  moto (moto requires cryptography, which has no win-arm64 wheel and needs a
+  Rust toolchain to build). Revisit moto if the platform constraint lifts.
+
+### Consequences
+
+No lost opt-outs under concurrency and full auditability of every suppression.
+Reads can be up to 30s stale — within the 60s bound but not instantaneous.
+Plus-addressed variants of an opted-out mailbox are all suppressed. The fake S3
+client must be kept faithful to the real API surface it mimics (put/get/list).

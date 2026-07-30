@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Automated outreach protocol: AWS CDK infrastructure and Salesforce integration."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "boto3>=1.43.59",
+    "phonenumbers>=9.0.35",
+    "polars>=1.43.1",
+]
 
 [dependency-groups]
 dev = [
@@ -15,6 +19,7 @@ dev = [
     "nodejs-wheel-binaries>=24.16.0",
     "pre-commit>=4.0",
     "pytest>=8.3",
+    "pytest-cov>=7.1.0",
     "ruff>=0.8",
 ]
 
@@ -28,10 +33,20 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests deliberately contain ambiguous-unicode adversarial inputs (homoglyphs).
+"tests/*" = ["RUF001"]
+
 [tool.mypy]
 strict = true
-files = ["infra", "tests"]
+files = ["infra", "src", "tests"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "src"]
+addopts = "--cov=suppression --cov=cleansing --cov-branch --cov-report=term-missing --cov-fail-under=100"
