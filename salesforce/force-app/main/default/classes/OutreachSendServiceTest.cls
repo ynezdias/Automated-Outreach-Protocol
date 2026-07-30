@@ -250,14 +250,15 @@ private class OutreachSendServiceTest {
     }
 
     @IsTest
-    static void invocableEnqueuesTheSend() {
-        configureSettings(50);
+    static void batchEntrySendsForReadyLead() {
+        // The batch runs in its own transactions, so settings come from the
+        // deployed Default custom-metadata record, not the test override.
         createApprovedTemplate();
         Lead lead = makeLead('+16502530011', timezoneWithLocalHour(12));
         Test.setMock(HttpCalloutMock.class, new TwilioMock());
 
         Test.startTest();
-        OutreachSendInvocable.send(new List<Id>{ lead.Id });
+        OutreachSendBatch.run();
         Test.stopTest();
 
         Assert.areEqual(1, [SELECT COUNT() FROM Outreach_Message__c WHERE Lead__c = :lead.Id]);

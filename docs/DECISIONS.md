@@ -860,3 +860,62 @@ that would have starved (< 150 examples) no longer exist to starve. The
 scratch-org deploy of the value set is validated by the existing CI job; if
 the plan document's taxonomy surfaces and disagrees, that is a new ADR, not an
 edit to this one.
+
+## ADR-021: Send throughput — hourly Batch Apex replaces the daily Flow
+
+### Context
+
+ADR-013's daily schedule-triggered Flow plus one Queueable capped at 90
+callouts yielded ~90 sends/day against a 50,000/month plan (F4). Meanwhile the
+real vendor limits are now known (ADR-017 update): 500 API requests/min,
+**10,000 SMS/day account cap**, a vendor-side 06:00-22:00 ET send window, and
+100+ active sender numbers.
+
+### Decision
+
+- **Batch Apex over chained Queueables.** `OutreachSendBatch`
+  (`Database.AllowsCallouts`, `Database.Stateful`) walks the whole Ready
+  backlog; every `execute()` is its own transaction with a fresh 100-callout
+  budget, so scope = `OutreachSendService.MAX_CALLOUTS_PER_RUN` (90) chunks
+  clear any backlog in one run. Chained Queueables offer the same callout
+  budget but require hand-rolled chain bookkeeping, give no built-in
+  progress/abort visibility, and can fan out concurrently; a batch is one
+  serialized, observable job.
+- **Hourly Scheduled Apex** (`OutreachSendScheduler`, cron `0 0 * * * ?`)
+  replaces the Flow trigger — Flows cannot schedule sub-daily. Running 24/7 is
+  safe: quiet hours, suppression, and the rate limit are enforced per-lead
+  inside each chunk, unchanged from ADR-013 (the batch delegates to
+  `OutreachSendService.sendBatch`; the ordering is untouched, and the
+  rate-limit check re-queries the trailing hour every chunk so the throttle
+  holds across chunk boundaries). The Flow, `OutreachSendInvocable`, and
+  `OutreachSendQueueable` are deleted — dead code that looks live is worse
+  than no code.
+- **Ceilings, recomputed with real numbers.** Machinery: ~90 sends/transaction
+  x unlimited chunks x 24 runs/day — not binding. Vendor API: 500 req/min —
+  not binding at this scale. **Binding: min(TextTorrent 10,000/day account
+  cap, Per_Number_Hourly_Limit__c x sending numbers x send-window hours).**
+  The 10DLC tier itself is not visible through TextTorrent (SignalHouse brand
+  ids exist on the account; the tier number needs a vendor answer) — until it
+  is known, the throttle is the governing dial we control.
+- **Per_Number_Hourly_Limit__c stays the throttle**, raised 50 → 200 in the
+  Default record: sending currently uses a single from-number, and 50/hr was
+  1,200/day even running 24h — under the 50k/month plan. 200/hr across the
+  ~13h recipient-local send window ≈ 2,600/day sustained (~78k/month
+  headroom); a 5,000-send day needs ~385/hr — set 400 for load tests or
+  peaks. Revisit when the 10DLC tier is confirmed or multi-number rotation
+  lands (the limit is per number by name, global in implementation, correct
+  while exactly one number sends).
+- **Load testing** uses `MockMessagingProvider`, double-gated behind
+  `Outreach_Setting__mdt.Use_Mock_Provider__c` AND a sandbox/scratch org —
+  production always resolves the real provider. A 5,000-message load test
+  with real sends was deliberately NOT run from here: it would deliver 5,000
+  real SMS through the production TextTorrent account (credits, carrier
+  reputation, a real recipient). The scratch-org procedure is
+  docs/RUNBOOK_load_test.md; a real-send variant is an explicit owner
+  decision.
+
+### Consequences
+
+Throughput scales to the vendor cap by turning one dial, with every
+compliance gate untouched and test-pinned inside the batch. The org needs a
+one-time `OutreachSendScheduler.scheduleHourly()` registration (runbook).

@@ -4,7 +4,7 @@
     <protected>false</protected>
     <values>
         <field>Per_Number_Hourly_Limit__c</field>
-        <value xsi:type="xsd:double">50.0</value>
+        <value xsi:type="xsd:double">200.0</value>
     </values>
     <values>
         <field>Twilio_Account_SID__c</field>
@@ -17,5 +17,9 @@
     <values>
         <field>Webhook_Base_Url__c</field>
         <value xsi:nil="true"/>
+    </values>
+    <values>
+        <field>Use_Mock_Provider__c</field>
+        <value xsi:type="xsd:boolean">false</value>
     </values>
 </CustomMetadata>

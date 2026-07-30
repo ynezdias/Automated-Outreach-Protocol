@@ -15,8 +15,8 @@
 public with sharing class OutreachSendService {
     public static final Integer QUIET_HOURS_START = 8; // inclusive, local
     public static final Integer QUIET_HOURS_END = 21; // exclusive, local
-    @TestVisible
-    private static final Integer MAX_CALLOUTS_PER_RUN = 90; // platform limit is 100
+    // Public: OutreachSendBatch sizes its scope to this, one transaction each.
+    public static final Integer MAX_CALLOUTS_PER_RUN = 90; // platform limit is 100
 
     public class SendOutcome {
         public Id leadId;

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Use_Mock_Provider__c</fullName>
+    <label>Use Mock Provider</label>
+    <description>Load-test switch (ADR-021): route sends to MockMessagingProvider (no callouts, no credits). Only honored in sandbox/scratch orgs — production ignores it by design.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+</CustomField>
