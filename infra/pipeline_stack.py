@@ -25,6 +25,8 @@ from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
+from infra.layers import dependencies_layer
+
 RAW_ENRICHMENT_PREFIX = "raw/enrichment/"
 SALESFORCE_SECRET_NAME = "outreach/salesforce/jwt"  # pragma: allowlist secret
 TEXTTORRENT_SECRET_NAME = "outreach/texttorrent"  # pragma: allowlist secret
@@ -67,12 +69,15 @@ class PipelineStack(Stack):
         texttorrent_secret = secretsmanager.Secret.from_secret_name_v2(
             self, "TextTorrentSecret", TEXTTORRENT_SECRET_NAME
         )
+        layer = dependencies_layer(self, "DependenciesLayer")
 
         def step_function(name: str, handler: str, *, timeout_minutes: int = 5) -> lambda_.Function:
             function = lambda_.Function(
                 self,
                 f"{name}Fn",
                 runtime=lambda_.Runtime.PYTHON_3_12,
+                architecture=lambda_.Architecture.ARM_64,
+                layers=[layer],
                 code=lambda_.Code.from_asset(_SRC_PATH),
                 handler=handler,
                 timeout=Duration.minutes(timeout_minutes),

@@ -90,3 +90,10 @@ def test_twilio_lookup_disabled_by_default(template: Template) -> None:
         env = fn["Properties"]["Environment"]["Variables"]
         assert env["TWILIO_LOOKUP_ENABLED"] == "false"
         assert env["COOLDOWN_DAYS"] == "90"
+
+
+def test_every_function_is_arm64_with_the_dependencies_layer(template: Template) -> None:
+    template.resource_count_is("AWS::Lambda::LayerVersion", 1)
+    for fn in template.find_resources("AWS::Lambda::Function").values():
+        assert fn["Properties"]["Architectures"] == ["arm64"]
+        assert fn["Properties"]["Layers"], "function missing the dependencies layer"

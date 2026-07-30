@@ -16,6 +16,8 @@ from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
+from infra.layers import dependencies_layer
+
 SUPPRESSION_HANDLER = "suppression.api.handler"
 
 _SRC_PATH = str(Path(__file__).resolve().parent.parent / "src")
@@ -38,6 +40,8 @@ class InferenceStack(Stack):
             self,
             "SuppressionApiFn",
             runtime=lambda_.Runtime.PYTHON_3_12,
+            architecture=lambda_.Architecture.ARM_64,
+            layers=[dependencies_layer(self, "DependenciesLayer")],
             code=lambda_.Code.from_asset(_SRC_PATH),
             handler=SUPPRESSION_HANDLER,
             timeout=Duration.seconds(30),
