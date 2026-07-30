@@ -509,7 +509,7 @@ bounce_or_autoreply -> loop_breaker -> proceed:
 - **Opt-out matches the WHOLE message** (carrier STOP semantics), after
   canonicalization: NFKC + casefold + explicit unicode-confusables fold
   (Cyrillic/Greek lookalikes, reviewable table) + zero-width strip +
-  punctuation collapapsed + whitespace-insensitive comparison. Fuzzy matching
+  punctuation collapsed + whitespace-insensitive comparison. Fuzzy matching
   (Levenshtein <= 1) applies only to keywords of length >= 4, so 3-letter
   keywords like END match exactly ("and" never suppresses).
 - **Imperative stop-phrases** (`^(please )?stop
