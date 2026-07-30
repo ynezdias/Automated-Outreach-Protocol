@@ -534,3 +534,48 @@ Whole-message semantics mean opt-out sentences that neither match a keyword
 nor start with an imperative stop-phrase flow to later rules — the classifier
 and human queue are the backstop for those. Every result carries the rule and
 trigger for reconstructability.
+
+## ADR-016: Messaging-provider adapter — TextTorrent behind IMessagingProvider
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The send (WO-07) and inbound (WO-08) paths were built Twilio-specific; the
+actual vendor is TextTorrent. The refactor work order references
+docs/PROVIDER.md — which is not in the repo — and requires that every existing
+WO-07/WO-08 Apex test pass unchanged.
+
+### Decision
+
+- `IMessagingProvider` (send -> ProviderResult{messageId, status, errorCode};
+  validateInbound -> Boolean) is the only surface the send service and both
+  REST endpoints touch, resolved via the `MessagingProvider` factory
+  (@TestVisible injectable). The send-gate order (suppression -> quiet hours ->
+  rate limit -> send -> log) is byte-for-byte untouched; only the callout call
+  site changed.
+- `TextTorrentProvider` quarantines ALL vendor wire details: auth via the
+  `TextTorrent` Named Credential (the Twilio one is deleted; still no keys in
+  Apex or Custom Settings), JSON send payload, response parsing, and webhook
+  validation (delegating to the existing HMAC-SHA1 URL+sorted-params check;
+  signature header `X-TextTorrent-Signature` with the legacy Twilio header
+  name as fallback).
+- **PROVIDER.md was absent**, so the wire contract is pinned by the existing
+  test suites instead: 2xx + JSON with the message id under `sid` (fallbacks
+  `id`, `message_id`) and provider status under `status`. The message id lands
+  in `Provider_Message_Id__c` (still External ID + Unique — the idempotency
+  key). When PROVIDER.md lands, reconcile TextTorrentProvider (and item 3's
+  validation scheme) in that one class.
+- Test-pinned names stay for now: the `TwilioWebhook` util class, the
+  `Twilio*Rest` endpoint class names, and `Outreach_Secret__mdt.
+  Twilio_Auth_Token__c` (now the provider signing key). Renaming them requires
+  editing tests, which this work order forbids; a follow-up rename WO can do
+  it wholesale.
+
+### Consequences
+
+Swapping vendors is one new class plus a factory line. The Twilio-era names in
+tests/utilities are cosmetic debt, listed above so nobody mistakes them for
+live Twilio coupling. The unverified TextTorrent endpoint path and payload
+shape are a deploy blocker until PROVIDER.md (or vendor docs) confirms them.

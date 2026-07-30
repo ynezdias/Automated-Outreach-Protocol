@@ -13,7 +13,7 @@ global with sharing class TwilioStatusCallbackRest {
     global static void handleStatus() {
         RestRequest request = RestContext.request;
         RestResponse response = RestContext.response;
-        if (!TwilioWebhook.isValidSignature(request)) {
+        if (!MessagingProvider.get().validateInbound(request)) {
             response.statusCode = 403;
             return;
         }

@@ -138,34 +138,17 @@ public with sharing class OutreachSendService {
             Template_Version__c = template.Version__c,
             Sent_At__c = Datetime.now()
         );
-        HttpRequest request = new HttpRequest();
-        request.setEndpoint(
-            'callout:Twilio/2010-04-01/Accounts/' +
-                OutreachSettings.twilioAccountSid() +
-                '/Messages.json'
-        );
-        request.setMethod('POST');
-        request.setHeader('Content-Type', 'application/x-www-form-urlencoded');
-        request.setBody(
-            'To=' + EncodingUtil.urlEncode(lead.Phone, 'UTF-8') +
-                '&From=' + EncodingUtil.urlEncode(OutreachSettings.fromNumber(), 'UTF-8') +
-                '&Body=' + EncodingUtil.urlEncode(template.Body__c, 'UTF-8')
-        );
         try {
-            HttpResponse response = new Http().send(request);
-            if (response.getStatusCode() == 201) {
-                Map<String, Object> payload = (Map<String, Object>) JSON.deserializeUntyped(
-                    response.getBody()
-                );
-                attempt.Provider_Message_Id__c = (String) payload.get('sid');
-                attempt.Delivery_Status__c = (String) payload.get('status');
+            ProviderResult result = MessagingProvider.get()
+                .send(lead.Phone, template.Body__c, lead.Id);
+            if (result.errorCode == null) {
+                attempt.Provider_Message_Id__c = result.messageId;
+                attempt.Delivery_Status__c = result.status;
                 attempt.Status__c = 'Sent';
             } else {
                 attempt.Status__c = 'Failed';
                 attempt.Delivery_Status__c = 'failed';
-                attempt.Send_Error__c = truncate(
-                    response.getStatusCode() + ' ' + response.getBody()
-                );
+                attempt.Send_Error__c = truncate(result.errorCode);
             }
         } catch (Exception error) {
             attempt.Status__c = 'Failed';

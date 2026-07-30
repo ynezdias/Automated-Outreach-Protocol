@@ -18,7 +18,13 @@ public with sharing class TwilioWebhook {
         if (String.isBlank(token) || String.isBlank(baseUrl)) {
             return false; // unconfigured -> reject everything, never fail open
         }
-        String provided = request.headers.get('X-Twilio-Signature');
+        // Provider-neutral: accept the TextTorrent header, with the legacy
+        // Twilio header name as a compatibility fallback (test-pinned; see
+        // ADR-016 — reconcile with docs/PROVIDER.md item 3 when it lands).
+        String provided = request.headers.get('X-TextTorrent-Signature');
+        if (String.isBlank(provided)) {
+            provided = request.headers.get('X-Twilio-Signature');
+        }
         if (String.isBlank(provided)) {
             return false; // unsigned -> reject
         }

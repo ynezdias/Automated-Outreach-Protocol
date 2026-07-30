@@ -16,7 +16,8 @@ guest profiles are org-bound). Follow this once per org.
 On the site's **Public Access Settings** (the auto-created guest profile):
 
 - Enabled Apex Class Access: `TwilioInboundRest`, `TwilioStatusCallbackRest`,
-  `TwilioWebhook`, `OutreachSettings`.
+  `TwilioWebhook`, `OutreachSettings`, `MessagingProvider`,
+  `TextTorrentProvider`, `IMessagingProvider`, `ProviderResult`.
 - Object permissions: Outreach_Message__c — Read, Create, Edit;
   Lead — Read, Edit.
 - Field permissions: all `Outreach_Message__c` fields used by the webhooks
