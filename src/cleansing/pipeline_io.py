@@ -40,9 +40,7 @@ def read_ndjson(s3: Any, bucket: str, key: str) -> list[Row]:
 
 def write_ndjson(s3: Any, bucket: str, key: str, rows: list[Row]) -> None:
     body = "".join(json.dumps(row) + "\n" for row in rows)
-    s3.put_object(
-        Bucket=bucket, Key=key, Body=body.encode(), ContentType="application/x-ndjson"
-    )
+    s3.put_object(Bucket=bucket, Key=key, Body=body.encode(), ContentType="application/x-ndjson")
 
 
 def step_key(run_id: str, name: str) -> str:

@@ -58,5 +58,7 @@ def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
         "rows_in": len(rows),
         "rows_out": len(valid),
         "rows_quarantined": len(quarantined),
-        "quarantine_key": pipeline_io.write_quarantine(s3, bucket, run_id, "01_schema", quarantined),
+        "quarantine_key": pipeline_io.write_quarantine(
+            s3, bucket, run_id, "01_schema", quarantined
+        ),
     }
