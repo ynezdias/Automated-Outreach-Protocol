@@ -87,8 +87,6 @@ def test_handler_without_any_inbound_emits_nothing(sf_env: Any) -> None:
 
 
 def test_latest_inbound_query_failure_fails_loud(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "salesforce.http.transport", lambda request: HttpResponse(500, {}, b"boom")
-    )
+    monkeypatch.setattr("salesforce.http.transport", lambda request: HttpResponse(500, {}, b"boom"))
     with pytest.raises(InboundGapError):
         latest_inbound_at("TOKEN", "https://org.example")

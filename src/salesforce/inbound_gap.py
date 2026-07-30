@@ -89,9 +89,7 @@ def latest_inbound_at(access_token: str, instance_url: str) -> datetime | None:
 
 
 def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
-    as_of = (
-        datetime.fromisoformat(event["as_of"]) if "as_of" in event else datetime.now(UTC)
-    )
+    as_of = datetime.fromisoformat(event["as_of"]) if "as_of" in event else datetime.now(UTC)
     creds = load_credentials(os.environ["SALESFORCE_SECRET_ID"], boto3.client("secretsmanager"))
     access_token, instance_url = get_access_token(creds)
     last_inbound = latest_inbound_at(access_token, instance_url)

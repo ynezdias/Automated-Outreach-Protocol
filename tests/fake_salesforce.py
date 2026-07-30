@@ -175,9 +175,7 @@ class FakeSalesforce:
                     }
                 ]
             )
-            return self._respond(
-                200, {"totalSize": len(records), "done": True, "records": records}
-            )
+            return self._respond(200, {"totalSize": len(records), "done": True, "records": records})
         assert soql.upper().startswith("SELECT COUNT()")
         return self._respond(200, {"totalSize": len(self.leads), "done": True})
 
