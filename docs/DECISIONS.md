@@ -810,3 +810,53 @@ commits, with or without AWS. Both guardrail implementations must agree on
 every truth-table row for CI to pass. When the inbound poller (ADR-017,
 Option A) replaces the webhook, the guardrail invocation moves with the
 insert point — the class and the truth table are transport-agnostic.
+
+## ADR-022: Final reply-intent taxonomy — 13 classes, reconciled against real data
+
+(The work order that produced this numbered it "ADR-018"; 018 and 019 were
+already taken by the Conflict-A/B decisions, and 020/021 by the guardrail port
+and pending throughput work. Substance unchanged.)
+
+### Context
+
+ADR-011's 12 intents were explicitly provisional, to be reconciled before real
+data existed. Real data now exists: the TextTorrent conversation export —
+which turned out to carry **no labels at all** (it is a raw message export;
+156,251 rows, 39,353 inbound replies, 28,047 distinct). The reconciliation is
+therefore empirical: the production guardrails plus deterministic pattern
+buckets were run over every distinct inbound reply to size candidate classes
+(estimates, not labels — docs/TAXONOMY.md documents the method and numbers).
+
+### Decision
+
+- Final set (13), updated in the `Outreach_Intent` Global Value Set BEFORE any
+  labeling or training, because picklist API names become load-bearing after:
+  Interested, Amount_Given, Question, Request_More_Info, Call_Request,
+  Process_Update, Not_Interested, Wrong_Person, Hostile, Opt_Out,
+  Legal_Escalation, Auto_Reply, Unclear.
+- Changes from ADR-011: `Not_Now` (75 unique < 150) and `Already_Financed`
+  (78 < 150) merged into Not_Interested; `Referral` (34 < 150, heterogeneous)
+  removed; `Amount_Given` (569 unique), `Call_Request` (358),
+  `Process_Update` (859), and `Hostile` (553) added on observed volume.
+- Opt_Out and Legal_Escalation stay per ADR-011's reasoning — guardrail-
+  detected, never ML-predicted, one consistent label on records. Auto_Reply
+  and the new Hostile are kept under the same rule; their sub-150 sample
+  counts are irrelevant because the classifier never has to learn them.
+- Auto-reply eligibility per class, with reasoning, is in TAXONOMY.md §5:
+  eligible = Interested, Amount_Given, Request_More_Info, Not_Interested,
+  Wrong_Person; everything else routes to a human in v1 (Question included,
+  until template coverage is proven).
+- TAXONOMY.md §6 is the labeling guide: definitions, real examples, boundary
+  cases, and precedence — it is what determines whether two humans agree.
+- Open questions recorded, not guessed (TAXONOMY.md §3): the plan document's
+  taxonomy remains unavailable (OQ-1); channel-switch requests as SMS
+  preference revocation (OQ-3); wrong-number auto-suppression (OQ-4); the
+  suspiciously low STOP volume implying carrier-level interception (OQ-5).
+
+### Consequences
+
+Labeling can start against a stable value set and a written guide. Two classes
+that would have starved (< 150 examples) no longer exist to starve. The
+scratch-org deploy of the value set is validated by the existing CI job; if
+the plan document's taxonomy surfaces and disagrees, that is a new ADR, not an
+edit to this one.
