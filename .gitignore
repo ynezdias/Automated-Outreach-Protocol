@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# CDK
+cdk.out/
+.cdk.staging/
+
+# Salesforce
+salesforce/.sf/
+salesforce/.sfdx/
+salesforce/.localdevserver/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
