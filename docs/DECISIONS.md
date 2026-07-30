@@ -487,3 +487,50 @@ of the auth token existing in two places (Named Credential for callouts,
 protected CMT for HMAC) — rotating it means updating both. Manually created
 leads with non-E.164 phones will land in the unmatched queue until phone
 hygiene or fuzzier matching improves.
+
+## ADR-015: Guardrail matching semantics — whole-message opt-out, bounded fuzz
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The opt-out invariant demands case-insensitive, punctuation-stripped,
+edit-distance-1 fuzzy keyword matching — but naive token matching suppresses
+interested prospects ("stop by our office next week"), and naive fuzzing makes
+"and" match "END". False-positive suppression is a real cost.
+
+### Decision
+
+Guardrails are pure string functions (`src/guardrails/`), no ML, evaluated in
+the fixed order opt_out -> legal_escalation -> hostility ->
+bounce_or_autoreply -> loop_breaker -> proceed:
+
+- **Opt-out matches the WHOLE message** (carrier STOP semantics), after
+  canonicalization: NFKC + casefold + explicit unicode-confusables fold
+  (Cyrillic/Greek lookalikes, reviewable table) + zero-width strip +
+  punctuation collapapsed + whitespace-insensitive comparison. Fuzzy matching
+  (Levenshtein <= 1) applies only to keywords of length >= 4, so 3-letter
+  keywords like END match exactly ("and" never suppresses).
+- **Imperative stop-phrases** (`^(please )?stop
+  (texting|sending|messaging|contacting|emailing|calling)`) also suppress —
+  "stop texting me" is an opt-out even though it is not a bare keyword;
+  negations ("please don't stop sending these") cannot match the anchor.
+- **Legal escalation before hostility**: a profane lawyer threat is legal, not
+  hostility. Legal terms use token-prefix matching (harass/harassment/
+  harassing); "report you" is a phrase match.
+- **Bounce/auto-reply**: OOO and auto-submitted markers match on both
+  channels; DSN codes (5.x.y) and SMTP 55x codes are email-only signals.
+- **Loop breaker last**: >= 2 outbound auto-replies in the thread forces human
+  review — but an opt-out in a looping thread still suppresses (order matters).
+- Hostility keyword list is deterministic and deliberately small; it will grow
+  by appending reviewed terms, never by inference.
+
+### Consequences
+
+"stop by our office" and "please don't stop sending these" can never be
+suppressed; "stop", "sto p", "stopp", and Cyrillic "ѕtop" always are.
+Whole-message semantics mean opt-out sentences that neither match a keyword
+nor start with an imperative stop-phrase flow to later rules — the classifier
+and human queue are the backstop for those. Every result carries the rule and
+trigger for reconstructability.

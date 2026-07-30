@@ -38,8 +38,10 @@ line-length = 100
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests deliberately contain ambiguous-unicode adversarial inputs (homoglyphs).
+# Tests deliberately contain ambiguous-unicode adversarial inputs (homoglyphs),
+# and the guardrails confusables table is made of exactly those characters.
 "tests/*" = ["RUF001"]
+"src/guardrails/text.py" = ["RUF001"]
 
 [tool.mypy]
 strict = true
