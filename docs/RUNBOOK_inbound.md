@@ -17,13 +17,34 @@ On the site's **Public Access Settings** (the auto-created guest profile):
 
 - Enabled Apex Class Access: `TwilioInboundRest`, `TwilioStatusCallbackRest`,
   `TwilioWebhook`, `OutreachSettings`, `MessagingProvider`,
-  `TextTorrentProvider`, `IMessagingProvider`, `ProviderResult`.
+  `TextTorrentProvider`, `IMessagingProvider`, `ProviderResult`,
+  `OutreachGuardrails`, `OutreachSuppressionSyncQueueable`.
 - Object permissions: Outreach_Message__c — Read, Create, Edit;
   Lead — Read, Edit.
 - Field permissions: all `Outreach_Message__c` fields used by the webhooks
   (Provider_Message_Id__c, Direction__c, Channel__c, Status__c,
-  Delivery_Status__c, Body__c, Sent_At__c, Unmatched__c, Send_Error__c) and
-  `Lead.Outreach_Status__c`, `Lead.Last_Reply_At__c`, `Lead.Phone`.
+  Delivery_Status__c, Body__c, Sent_At__c, Unmatched__c, Send_Error__c,
+  Guardrail_Action__c, Guardrail_Rule__c, Needs_Review__c) and
+  `Lead.Outreach_Status__c`, `Lead.Last_Reply_At__c`, `Lead.Phone`,
+  `Lead.Auto_Reply_Count__c` (read), `Lead.Opted_Out__c`, `Lead.DoNotCall`,
+  `Lead.HasOptedOutOfEmail`, `Lead.Opt_Out_At__c`, `Lead.Opt_Out_Source__c`.
+
+## 3b. Configure the AWS suppression mirror (ADR-020)
+
+1. Deploy the inference stack; note the API URL from the `OutreachApi`
+   output (`https://<api-id>.execute-api.us-east-2.amazonaws.com/prod`).
+2. Mint an access key for the `salesforce-suppression-caller` IAM user (it
+   can invoke exactly `POST /suppressions`, nothing else).
+3. Setup → Named Credentials → **AWS Suppression**: set the endpoint to the
+   API URL and enter the access key/secret (AWS SigV4, service
+   `execute-api`, region `us-east-2`). Keys live only here — never in code,
+   never in Custom Settings.
+4. Verify: text STOP from the test phone. The Lead flips to
+   Suppressed/Opted_Out immediately; within 60 seconds the number appears in
+   the AWS list (`SuppressionStore.is_suppressed` or a new object under
+   `suppression/events/`). If AWS is unreachable, the message gets
+   `Needs_Review__c` after the retry budget — the Salesforce send gate is
+   closed regardless.
 
 ## 3. Configure signature validation (required — endpoints fail closed)
 

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Opt_Out_Source__c</fullName>
+    <label>Opt Out Source</label>
+    <description>Where the opt-out came from (e.g. inbound_sms_guardrail, texttorrent_reconciliation, manual). Consent provenance is audit data.</description>
+    <type>Text</type>
+    <length>80</length>
+    <required>false</required>
+</CustomField>

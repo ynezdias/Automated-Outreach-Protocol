@@ -8,6 +8,14 @@
  * logging causes double replies). Senders with no matching Lead are logged to
  * the unmatched queue (Unmatched__c = true) rather than dropped.
  *
+ * Order of operations is fixed (ADR-020): signature check -> idempotent
+ * insert -> guardrails -> persist result. Guardrails run after the insert so
+ * a provider retry short-circuits at the idempotency check and can never
+ * re-run suppression side effects. On suppress_and_stop the Lead opt-out is
+ * written synchronously in this transaction (it gates the next send) and the
+ * AWS suppression list is mirrored async via OutreachSuppressionSyncQueueable.
+ * On human_review the message is flagged; no automated response of any kind.
+ *
  * Deliberately does NOT call the classifier: replies are answered manually
  * for now, which generates labeled training data.
  */
@@ -57,10 +65,46 @@ global with sharing class TwilioInboundRest {
             respondOk(response);
             return;
         }
+
+        // Guardrails: deterministic, no network, evaluated exactly once per
+        // provider message id (the idempotent insert above is the gate).
+        Integer priorAutoReplies = matched == null || matched.Auto_Reply_Count__c == null
+            ? 0
+            : Integer.valueOf(matched.Auto_Reply_Count__c);
+        OutreachGuardrails.Result verdict = OutreachGuardrails.evaluate(
+            form.get('Body'),
+            priorAutoReplies,
+            'sms'
+        );
+        Boolean suppress = verdict.action == OutreachGuardrails.SUPPRESS_AND_STOP;
+        String normalizedFrom = TwilioWebhook.normalizePhone(fromNumber);
+        message.Guardrail_Action__c = verdict.action;
+        message.Guardrail_Rule__c = verdict.rule;
+        if (verdict.action == OutreachGuardrails.HUMAN_REVIEW) {
+            message.Needs_Review__c = true;
+        }
+        if (suppress && normalizedFrom == null) {
+            // No identifier to mirror to the AWS list — a human must close it.
+            message.Needs_Review__c = true;
+        }
+        update message;
+
         if (matched != null) {
-            matched.Outreach_Status__c = 'Replied';
+            matched.Outreach_Status__c = suppress ? 'Suppressed' : 'Replied';
             matched.Last_Reply_At__c = Datetime.now();
+            if (suppress) {
+                matched.Opted_Out__c = true;
+                matched.DoNotCall = true;
+                matched.HasOptedOutOfEmail = true;
+                matched.Opt_Out_At__c = Datetime.now();
+                matched.Opt_Out_Source__c = 'inbound_sms_guardrail';
+            }
             update matched;
+        }
+        if (suppress && normalizedFrom != null) {
+            System.enqueueJob(
+                new OutreachSuppressionSyncQueueable(normalizedFrom, verdict.rule, message.Id, 0)
+            );
         }
         respondOk(response);
     }
@@ -70,7 +114,7 @@ global with sharing class TwilioInboundRest {
             return null;
         }
         List<Lead> leads = [
-            SELECT Id
+            SELECT Id, Auto_Reply_Count__c
             FROM Lead
             WHERE Phone = :normalizedPhone
             ORDER BY CreatedDate DESC

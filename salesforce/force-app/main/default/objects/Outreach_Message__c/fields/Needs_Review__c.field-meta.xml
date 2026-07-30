@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Needs_Review__c</fullName>
+    <label>Needs Review</label>
+    <description>Flagged for the human review queue (guardrail human_review verdict, or a failed AWS suppression sync). No automated response of any kind is sent while set.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

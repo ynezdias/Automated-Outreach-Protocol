@@ -13,7 +13,7 @@ def build_app() -> cdk.App:
     app = cdk.App()
     data = DataStack(app, "OutreachDataStack")
     PipelineStack(app, "OutreachPipelineStack", data_bucket=data.data_bucket)
-    InferenceStack(app, "OutreachInferenceStack")
+    InferenceStack(app, "OutreachInferenceStack", data_bucket=data.data_bucket)
     ObservabilityStack(app, "OutreachObservabilityStack")
     return app
 

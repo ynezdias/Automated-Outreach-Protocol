@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Guardrail_Rule__c</fullName>
+    <label>Guardrail Rule</label>
+    <description>Which guardrail rule fired (opt_out, legal_escalation, hostility, bounce_or_autoreply, loop_breaker); blank when the message proceeded.</description>
+    <type>Text</type>
+    <length>40</length>
+    <required>false</required>
+</CustomField>
