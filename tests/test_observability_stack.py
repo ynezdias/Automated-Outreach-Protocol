@@ -1,14 +1,18 @@
 """Unit tests for the observability stack."""
 
 import aws_cdk as cdk
+import pytest
 from aws_cdk.assertions import Match, Template
 
 from infra.observability_stack import ObservabilityStack
 
 
-def test_drift_alarm_over_one_percent() -> None:
-    template = Template.from_stack(ObservabilityStack(cdk.App(), "TestObservabilityStack"))
-    template.resource_count_is("AWS::CloudWatch::Alarm", 1)
+@pytest.fixture(scope="module")
+def template() -> Template:
+    return Template.from_stack(ObservabilityStack(cdk.App(), "TestObservabilityStack"))
+
+
+def test_drift_alarm_over_one_percent(template: Template) -> None:
     template.has_resource_properties(
         "AWS::CloudWatch::Alarm",
         Match.object_like(
@@ -21,3 +25,31 @@ def test_drift_alarm_over_one_percent() -> None:
             }
         ),
     )
+
+
+def test_inbound_gap_alarm_at_four_business_hours(template: Template) -> None:
+    template.resource_count_is("AWS::CloudWatch::Alarm", 2)
+    template.has_resource_properties(
+        "AWS::CloudWatch::Alarm",
+        Match.object_like(
+            {
+                "Namespace": "Outreach/Inbound",
+                "MetricName": "InboundGapBusinessSeconds",
+                "Threshold": 14400,
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                # Missing data must breach: a dead detector or a never-populated
+                # inbox both mean nobody is watching the inbound path.
+                "TreatMissingData": "breaching",
+            }
+        ),
+    )
+
+
+def test_both_alarms_page_the_sns_topic(template: Template) -> None:
+    template.resource_count_is("AWS::SNS::Topic", 1)
+    template.has_resource_properties(
+        "AWS::SNS::Subscription",
+        Match.object_like({"Protocol": "email", "Endpoint": "ydias@fundmatellc.com"}),
+    )
+    for alarm in template.find_resources("AWS::CloudWatch::Alarm").values():
+        assert alarm["Properties"]["AlarmActions"], "alarm has no paging action"

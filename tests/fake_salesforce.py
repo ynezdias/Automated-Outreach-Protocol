@@ -52,6 +52,7 @@ class FakeSalesforce:
         self.job_error = job_error
         self.reject_statuses = list(reject_statuses or [])
         self.leads: dict[str, dict[str, str]] = {}
+        self.latest_inbound: str | None = None
         self.jobs: dict[str, dict[str, Any]] = {}
         self.token_claims: list[dict[str, Any]] = []
         self.api_calls = 0
@@ -162,6 +163,21 @@ class FakeSalesforce:
 
     def _query(self, path: str) -> HttpResponse:
         soql = unquote(path.split("?q=", 1)[1].replace("+", " "))
+        if "FROM Outreach_Message__c" in soql:
+            assert "Direction__c = 'Inbound'" in soql
+            records = (
+                []
+                if self.latest_inbound is None
+                else [
+                    {
+                        "attributes": {"type": "Outreach_Message__c"},
+                        "CreatedDate": self.latest_inbound,
+                    }
+                ]
+            )
+            return self._respond(
+                200, {"totalSize": len(records), "done": True, "records": records}
+            )
         assert soql.upper().startswith("SELECT COUNT()")
         return self._respond(200, {"totalSize": len(self.leads), "done": True})
 

@@ -29,6 +29,7 @@ RAW_ENRICHMENT_PREFIX = "raw/enrichment/"
 SALESFORCE_SECRET_NAME = "outreach/salesforce/jwt"  # pragma: allowlist secret
 SYNC_HANDLER = "salesforce.sync.handler"
 RECONCILE_HANDLER = "salesforce.reconcile.handler"
+INBOUND_GAP_HANDLER = "salesforce.inbound_gap.handler"
 
 #: Pipeline steps in execution order: (construct name, Lambda handler module).
 STEPS = (
@@ -116,6 +117,18 @@ class PipelineStack(Stack):
             "DailyReconciliation",
             schedule=events.Schedule.rate(Duration.days(1)),
             targets=[targets.LambdaFunction(reconcile_fn)],
+        )
+
+        # Inbound-freshness detector: emits the business-hours gap since the
+        # newest inbound message every 15 minutes; observability alarms at 4h.
+        inbound_gap_fn = step_function("InboundGap", INBOUND_GAP_HANDLER)
+        salesforce_secret.grant_read(inbound_gap_fn)
+        inbound_gap_fn.add_to_role_policy(metrics_policy)
+        events.Rule(
+            self,
+            "InboundGapSchedule",
+            schedule=events.Schedule.rate(Duration.minutes(15)),
+            targets=[targets.LambdaFunction(inbound_gap_fn)],
         )
         self.state_machine = sfn.StateMachine(
             self,
