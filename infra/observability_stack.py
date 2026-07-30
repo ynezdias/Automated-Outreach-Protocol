@@ -11,6 +11,8 @@ from constructs import Construct
 
 SYNC_METRIC_NAMESPACE = "Outreach/Sync"
 INBOUND_METRIC_NAMESPACE = "Outreach/Inbound"
+TEXTTORRENT_METRIC_NAMESPACE = "Outreach/TextTorrent"
+SUPPRESSION_METRIC_NAMESPACE = "Outreach/Suppression"
 DRIFT_ALARM_THRESHOLD_PERCENT = 1
 INBOUND_GAP_THRESHOLD_SECONDS = 4 * 60 * 60  # 4 business hours
 PAGING_EMAIL = "ydias@fundmatellc.com"
@@ -72,3 +74,51 @@ class ObservabilityStack(Stack):
             ),
         )
         inbound_gap_alarm.add_alarm_action(cloudwatch_actions.SnsAction(paging_topic))
+
+        canary_metric = cloudwatch.Metric(
+            namespace=TEXTTORRENT_METRIC_NAMESPACE,
+            metric_name="CanaryByteIdentical",
+            statistic="Minimum",
+            period=Duration.hours(24),
+        )
+        canary_alarm = cloudwatch.Alarm(
+            self,
+            "RewriteCanaryAlarm",
+            metric=canary_metric,
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+            # A missing datapoint means the canary didn't run — which is the same
+            # incident as a mutated message: nobody verified byte identity today.
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+            alarm_description=(
+                "TextTorrent stored message text differs from the submitted bytes "
+                "(AI rewriter active?) or the daily canary failed to run. Approved "
+                "template immutability is not being verified."
+            ),
+        )
+        canary_alarm.add_alarm_action(cloudwatch_actions.SnsAction(paging_topic))
+
+        divergence_metric = cloudwatch.Metric(
+            namespace=SUPPRESSION_METRIC_NAMESPACE,
+            metric_name="OptOutDivergence",
+            statistic="Maximum",
+            period=Duration.hours(24),
+        )
+        divergence_alarm = cloudwatch.Alarm(
+            self,
+            "OptOutDivergenceAlarm",
+            metric=divergence_metric,
+            threshold=0,
+            evaluation_periods=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            # Zero is the only acceptable number, and a missing datapoint means
+            # the reconciliation job did not run — page either way.
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+            alarm_description=(
+                "Our suppression list and TextTorrent's blocked list diverged (an "
+                "opt-out was missed on one side), or the nightly reconciliation "
+                "did not run."
+            ),
+        )
+        divergence_alarm.add_alarm_action(cloudwatch_actions.SnsAction(paging_topic))

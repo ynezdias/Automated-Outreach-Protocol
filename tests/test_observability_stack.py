@@ -27,8 +27,38 @@ def test_drift_alarm_over_one_percent(template: Template) -> None:
     )
 
 
+def test_rewrite_canary_alarm_on_any_non_identical_day(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::CloudWatch::Alarm",
+        Match.object_like(
+            {
+                "Namespace": "Outreach/TextTorrent",
+                "MetricName": "CanaryByteIdentical",
+                "Threshold": 1,
+                "ComparisonOperator": "LessThanThreshold",
+                "TreatMissingData": "breaching",
+            }
+        ),
+    )
+
+
+def test_optout_divergence_alarm_is_zero_tolerance(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::CloudWatch::Alarm",
+        Match.object_like(
+            {
+                "Namespace": "Outreach/Suppression",
+                "MetricName": "OptOutDivergence",
+                "Threshold": 0,
+                "ComparisonOperator": "GreaterThanThreshold",
+                "TreatMissingData": "breaching",
+            }
+        ),
+    )
+
+
 def test_inbound_gap_alarm_at_four_business_hours(template: Template) -> None:
-    template.resource_count_is("AWS::CloudWatch::Alarm", 2)
+    template.resource_count_is("AWS::CloudWatch::Alarm", 4)
     template.has_resource_properties(
         "AWS::CloudWatch::Alarm",
         Match.object_like(

@@ -27,9 +27,12 @@ from constructs import Construct
 
 RAW_ENRICHMENT_PREFIX = "raw/enrichment/"
 SALESFORCE_SECRET_NAME = "outreach/salesforce/jwt"  # pragma: allowlist secret
+TEXTTORRENT_SECRET_NAME = "outreach/texttorrent"  # pragma: allowlist secret
 SYNC_HANDLER = "salesforce.sync.handler"
 RECONCILE_HANDLER = "salesforce.reconcile.handler"
 INBOUND_GAP_HANDLER = "salesforce.inbound_gap.handler"
+CANARY_HANDLER = "texttorrent.canary.handler"
+SUPPRESSION_RECONCILE_HANDLER = "texttorrent.reconcile.handler"
 
 #: Pipeline steps in execution order: (construct name, Lambda handler module).
 STEPS = (
@@ -61,6 +64,9 @@ class PipelineStack(Stack):
         salesforce_secret = secretsmanager.Secret.from_secret_name_v2(
             self, "SalesforceJwtSecret", SALESFORCE_SECRET_NAME
         )
+        texttorrent_secret = secretsmanager.Secret.from_secret_name_v2(
+            self, "TextTorrentSecret", TEXTTORRENT_SECRET_NAME
+        )
 
         def step_function(name: str, handler: str, *, timeout_minutes: int = 5) -> lambda_.Function:
             function = lambda_.Function(
@@ -77,6 +83,9 @@ class PipelineStack(Stack):
                     # Twilio Lookup costs $0.01/query — off until a human enables it.
                     "TWILIO_LOOKUP_ENABLED": "false",
                     "SALESFORCE_SECRET_ID": SALESFORCE_SECRET_NAME,
+                    "TEXTTORRENT_SECRET_ID": TEXTTORRENT_SECRET_NAME,
+                    # Company-controlled test phone; the daily canary texts it.
+                    "TEXTTORRENT_CANARY_TO": "+15512357742",
                 },
             )
             data_bucket.grant_read_write(function)
@@ -129,6 +138,31 @@ class PipelineStack(Stack):
             "InboundGapSchedule",
             schedule=events.Schedule.rate(Duration.minutes(15)),
             targets=[targets.LambdaFunction(inbound_gap_fn)],
+        )
+
+        # Daily AI-rewriter canary (Conflict A): byte-identity of sent text.
+        canary_fn = step_function("RewriteCanary", CANARY_HANDLER)
+        texttorrent_secret.grant_read(canary_fn)
+        canary_fn.add_to_role_policy(metrics_policy)
+        events.Rule(
+            self,
+            "DailyRewriteCanary",
+            schedule=events.Schedule.rate(Duration.days(1)),
+            targets=[targets.LambdaFunction(canary_fn)],
+        )
+
+        # Nightly opt-out reconciliation (Conflict B): zero-divergence check
+        # between our suppression store and the vendor blocked list.
+        suppression_reconcile_fn = step_function(
+            "SuppressionReconcile", SUPPRESSION_RECONCILE_HANDLER, timeout_minutes=15
+        )
+        texttorrent_secret.grant_read(suppression_reconcile_fn)
+        suppression_reconcile_fn.add_to_role_policy(metrics_policy)
+        events.Rule(
+            self,
+            "NightlySuppressionReconciliation",
+            schedule=events.Schedule.rate(Duration.days(1)),
+            targets=[targets.LambdaFunction(suppression_reconcile_fn)],
         )
         self.state_machine = sfn.StateMachine(
             self,

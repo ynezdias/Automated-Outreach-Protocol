@@ -631,15 +631,116 @@ captures have run yet.
   page after 4 business hours. Preferred over silent reply loss; revisit by
   gating on recent outbound volume if it becomes noisy.
 
-### Pending (blocked on credentials / user decisions)
+### Update (2026-07-30, after live credential access)
 
-- All captures in PROVIDER.md §6, including a real send to and reply from the
-  developer's own phone, and delivery-status integer semantics.
-- Whether the TextTorrent dashboard UI offers webhooks the API docs omit.
-- The inbound-transport decision if polling stands: an AWS poller upserting
-  inbound messages into Salesforce on `Provider_Message_Id__c` (recommended —
-  matches the existing AWS→Salesforce integration direction), or scheduled
-  Apex polling via Named Credential. The WO-08 webhook endpoints have no
-  caller under either polling option.
-- Byte-identity canary evidence for the AI cleaner (Conflict A); the opt-out
-  word / blocked-list endpoints feed Conflict B reconciliation.
+- **F1 (inbound signature validation) is closed, differently than assumed:
+  there is no signature scheme to validate because there is no webhook.**
+  Nothing inbound ever calls our endpoints under this vendor. The control
+  that replaces signature validation is authenticated outbound polling plus
+  the inbound-freshness pager; the WO-08 Apex REST inbound endpoint and the
+  Twilio signature fallback are deleted in the same commit as the poller.
+- Credentials were found in the legacy `textTorrenttoSf` Lambda's environment
+  variables (`TT_SID` / `TT_PUBLIC_KEY`; its IAM role has no Secrets Manager
+  grants at all) and normalized into the `outreach/texttorrent` secret
+  (`{api_sid, public_key}`). Our code reads only the new secret; the legacy
+  function belongs to another project and was left untouched.
+- Live-verified: the header pair authenticates; `/user/auth/me` is POST (the
+  docs imply GET); the account's real limits are 500 requests/min and 10,000
+  SMS/day (the documented 60 rpm is the generic tier); TextTorrent enforces
+  its own 06:00-22:00 America/New_York send window
+  (`message_time_restriction`); the vendor blocked list holds ~10,487 numbers.
+- **Inbound transport approved: Option A** — an AWS poller Lambda upserting
+  inbound messages into Salesforce on `Provider_Message_Id__c` (idempotency
+  enforced at the database layer via External ID + Unique). The poll
+  cursor/watermark lives in SSM Parameter Store, not Salesforce; SSM over
+  DynamoDB keeps the "no DynamoDB" anti-goal intact — the cursor is transport
+  bookkeeping, not live state. The poll interval awaits sign-off on the
+  latency/budget proposal; the poller is not built until then.
+- Conflicts A and B are settled in ADR-018 and ADR-019.
+
+### Still pending
+
+- The capture fixtures in PROVIDER.md §6 (real send + reply from the test
+  phone, delivery-status integer semantics) and the provider-code
+  reconciliation they gate.
+- The dashboard-UI webhook check (owner is doing this personally).
+
+## ADR-018: Conflict A — vendor AI message rewriter: disable, then verify daily
+
+### Context
+
+TextTorrent "automatically clean[s] messages using AI to fix encoding issues"
+on the API send path itself (docs 5.9), and separately offers AI reply
+generation (5.11). Any in-flight mutation of an approved template defeats
+template immutability (only Approved, versioned templates are sendable) and
+makes the audit trail lie about what was actually sent. No API toggle for the
+send-path cleaner is documented.
+
+### Decision
+
+- Request written, account-wide disablement from Dev@texttorrent.com — draft
+  at docs/vendor/ai-rewriter-disable-request.md; the written reply gets filed
+  next to it. Vendor claims are treated as unverified until the canary agrees.
+- Trust is continuous, not one-time: the daily canary Lambda
+  (`texttorrent.canary`) sends rewriter-tempting text (mixed case, em dash,
+  doubled quotes and exclamations, stray symbols, a hard line break) to the
+  company-controlled test number, reads the stored message back from the API,
+  and emits `Outreach/TextTorrent CanaryByteIdentical`. The alarm pages on
+  anything but a daily 1 — a missing run and a mutated message are the same
+  incident (missing data is breaching). A vendor can re-enable a feature in a
+  release; we find out the same day.
+- The AI reply-generation endpoint is never called (anti-goal: no LLM in the
+  reply path). The client deliberately has no method for it.
+- Accepted limitation: API read-back proves server-side storage fidelity, not
+  carrier-path fidelity. The one-time live acceptance
+  (docs/RUNBOOK_texttorrent.md) compares the handset-received text
+  byte-for-byte; ongoing carrier-path drift is out of scope until evidence
+  says otherwise.
+
+### Consequences
+
+Cost is one SMS per day. If the vendor confirms disablement in writing, the
+canary still runs — the confirmation dates a promise; the canary tests the
+present.
+
+## ADR-019: Conflict B — opt-out authority: ours is authoritative, theirs is a backstop
+
+### Context
+
+Two suppression systems exist: our append-only store (ADR-009, the compliance
+control) and TextTorrent's opt-out-word engine feeding a blocked list (10,487
+entries at adoption). They WILL diverge: their engine auto-blocks replies our
+pipeline could miss, and our cross-channel suppressions never reach them on
+their own.
+
+### Decision
+
+- **Our suppression store is the single source of truth.** TextTorrent's
+  blocked list is a backstop we reconcile against, never the authority.
+- Their auto-blocking CAN be effectively disabled (opt-out words are
+  deletable via API, docs 4.9.4) but deliberately is NOT disabled yet: until
+  our reply pipeline is live end to end, their engine is the only thing
+  catching STOP replies in real time. Consolidating to one enforcement point
+  is revisited once the inbound poller and guardrails are in production.
+- Nightly bidirectional reconciliation (`texttorrent.reconcile`):
+  - In theirs, not ours -> added to our store immediately (source
+    `texttorrent_reconciliation`) — an opt-out we missed.
+  - In ours, not theirs -> pushed to their blocked list (SMS identifiers
+    only; emails are not pushed to an SMS vendor).
+  - Unparseable vendor entries count as divergence — a human must look.
+  - `Outreach/Suppression OptOutDivergence` alarms at > 0 with missing-data
+    breaching: zero is the only acceptable number, and a job that did not run
+    pages too.
+- First production run imports the existing vendor blocked list (~10.5k
+  numbers) into our store and alarms once. That alarm is correct — those are
+  opt-outs our store does not have. Imported entries carry the reconciliation
+  source so provenance is never confused with a first-party STOP.
+- Fallback: `{"export_key": ...}` reconciles from a dropped vendor CSV export
+  if the API pull is ever unavailable.
+
+### Consequences
+
+An opt-out entered on either side is enforced on both within 24 hours, and
+any disagreement pages a human. Live acceptance per docs/RUNBOOK_texttorrent.md:
+opt a number out through the TextTorrent UI only and watch the job catch it,
+add it, and alarm.

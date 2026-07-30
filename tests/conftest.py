@@ -117,3 +117,19 @@ def sf_env(sf_creds: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
 def _public_key_for(creds: Any) -> rsa_lib.PublicKey:
     private = rsa_lib.PrivateKey.load_pkcs1(creds.private_key_pem.encode())
     return rsa_lib.PublicKey(private.n, private.e)
+
+
+@pytest.fixture
+def tt_env(sf_env: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """sf_env plus a FakeTextTorrent wired as the HTTP transport."""
+    from tests.fake_texttorrent import API_SID, PUBLIC_KEY, FakeTextTorrent
+
+    fake = FakeTextTorrent()
+    monkeypatch.setattr("salesforce.http.transport", fake)
+    sf_env.boto_clients["secretsmanager"]._secrets["outreach/texttorrent"] = json.dumps(
+        {"api_sid": API_SID, "public_key": PUBLIC_KEY}
+    )
+    monkeypatch.setenv("TEXTTORRENT_SECRET_ID", "outreach/texttorrent")
+    monkeypatch.setenv("TEXTTORRENT_CANARY_TO", "+16505550100")
+    sf_env.tt = fake
+    return sf_env

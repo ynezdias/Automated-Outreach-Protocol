@@ -138,6 +138,11 @@ class SuppressionStore:
             indeterminate_identifiers=tuple(indeterminate),
         )
 
+    def current_identifiers(self) -> set[str]:
+        """Every currently suppressed identifier (normalized), for reconciliation."""
+        self._refresh_if_stale()
+        return set(self._cache)
+
     def export_snapshot(self) -> str:
         """Derive the current opt-out set from the event log and write it as Parquet."""
         current = _current_set(self._load_events())
