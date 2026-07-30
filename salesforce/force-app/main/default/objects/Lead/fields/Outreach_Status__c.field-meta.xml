@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Outreach_Status__c</fullName>
+    <label>Outreach Status</label>
+    <description>Live outreach state. Salesforce is the single system of record for this.</description>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>New</fullName>
+                <default>true</default>
+                <label>New</label>
+            </value>
+            <value>
+                <fullName>Queued</fullName>
+                <default>false</default>
+                <label>Queued</label>
+            </value>
+            <value>
+                <fullName>Contacted</fullName>
+                <default>false</default>
+                <label>Contacted</label>
+            </value>
+            <value>
+                <fullName>Replied</fullName>
+                <default>false</default>
+                <label>Replied</label>
+            </value>
+            <value>
+                <fullName>Human_Review</fullName>
+                <default>false</default>
+                <label>Human Review</label>
+            </value>
+            <value>
+                <fullName>Suppressed</fullName>
+                <default>false</default>
+                <label>Suppressed</label>
+            </value>
+            <value>
+                <fullName>Closed</fullName>
+                <default>false</default>
+                <label>Closed</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

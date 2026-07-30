@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reply_Template__c</fullName>
+    <label>Reply Template</label>
+    <description>The approved template this outbound message was generated from. Restricted delete keeps sent messages reconstructable.</description>
+    <type>Lookup</type>
+    <referenceTo>Reply_Template__c</referenceTo>
+    <relationshipLabel>Messages Sent</relationshipLabel>
+    <relationshipName>Messages_Sent</relationshipName>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <required>false</required>
+</CustomField>

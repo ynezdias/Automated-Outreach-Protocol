@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Status__c</fullName>
+    <label>Status</label>
+    <description>Only Approved versions are sendable. Approved cannot return to Draft (validation rule).</description>
+    <type>Picklist</type>
+    <trackHistory>true</trackHistory>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Draft</fullName>
+                <default>true</default>
+                <label>Draft</label>
+            </value>
+            <value>
+                <fullName>In_Review</fullName>
+                <default>false</default>
+                <label>In Review</label>
+            </value>
+            <value>
+                <fullName>Approved</fullName>
+                <default>false</default>
+                <label>Approved</label>
+            </value>
+            <value>
+                <fullName>Retired</fullName>
+                <default>false</default>
+                <label>Retired</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

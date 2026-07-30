@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Last_Contacted_At__c</fullName>
+    <label>Last Contacted At</label>
+    <description>Timestamp of the most recent outbound message. Feeds the pipeline cooldown exclusion.</description>
+    <type>DateTime</type>
+    <required>false</required>
+</CustomField>

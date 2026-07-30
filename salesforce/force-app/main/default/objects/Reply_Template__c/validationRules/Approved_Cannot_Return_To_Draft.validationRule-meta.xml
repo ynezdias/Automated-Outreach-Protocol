@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Approved_Cannot_Return_To_Draft</fullName>
+    <active>true</active>
+    <description>Compliance control: an Approved template version can never move back to Draft. Retire it and create a new version instead.</description>
+    <errorConditionFormula>ISPICKVAL(PRIORVALUE(Status__c), &quot;Approved&quot;) &amp;&amp; ISPICKVAL(Status__c, &quot;Draft&quot;)</errorConditionFormula>
+    <errorDisplayField>Status__c</errorDisplayField>
+    <errorMessage>An Approved template cannot move back to Draft. Retire this version and create a new one.</errorMessage>
+</ValidationRule>

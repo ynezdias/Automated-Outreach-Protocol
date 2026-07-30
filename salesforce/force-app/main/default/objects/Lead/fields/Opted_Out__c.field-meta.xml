@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Opted_Out__c</fullName>
+    <label>Opted Out</label>
+    <description>Set when the guardrail opt-out regex matches. Mirrors the AWS suppression list; never cleared automatically.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

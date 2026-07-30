@@ -286,3 +286,53 @@ exclusion are fully auditable per run. The pipeline never deploys with paid
 lookups silently enabled. Until dependency bundling lands, deploying the stack
 produces Lambdas that cannot import their dependencies — synth and tests are
 the current acceptance surface.
+
+## ADR-011: Salesforce data model — provisional intent taxonomy, template immutability
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The Salesforce metadata work order references plan section 6, which is not in
+the repo; the 12-intent taxonomy is not enumerated anywhere versioned. Several
+modeling details also needed fixing: where the taxonomy lives, sharing models,
+and how template immutability is enforced.
+
+### Decision
+
+- **Provisional 12-intent taxonomy** as the `Outreach_Intent` Global Value Set
+  (single source referenced by Lead, Outreach_Message__c, Reply_Template__c):
+  Interested, Question, Request_More_Info, Not_Interested, Not_Now,
+  Already_Financed, Wrong_Person, Referral, Opt_Out, Legal_Escalation,
+  Auto_Reply, Unclear. Opt_Out and Legal_Escalation are guardrail-detected
+  (regex/keywords, never ML) but remain in the taxonomy so records carry one
+  consistent label. **Rename/replace values before real data exists** if the
+  plan's taxonomy differs — API names are load-bearing after that.
+- **Idempotency/upsert keys**: `Outreach_Message__c.Provider_Message_Id__c`
+  (case-sensitive) and `Lead.Outreach_External_Id__c` (case-insensitive, holds
+  the pipeline's UUIDv5) are both External ID + Unique.
+- **Template immutability** via two validation rules: Approved → Draft blocked;
+  `Body__c` edits blocked whenever PRIORVALUE(Status) is Approved — including
+  edits smuggled into the same update that retires the record. Approved →
+  Retired is the only exit. Enforced with Apex tests (ReplyTemplateLockTest).
+- **Least privilege**: Outreach_Integration_User grants R/C/E (never delete) on
+  Lead and Outreach_Message__c, read-only Reply_Template__c, FLS on exactly the
+  outreach fields plus Lead.Email/Phone, and nothing else — no Modify All Data,
+  no View All. OutreachIntegrationUserAccessTest pins the boundary (built on
+  the Minimum Access - Salesforce profile). Outreach_Reviewer is a separate set
+  for the human queue: work leads, read threads, record manual messages,
+  read-only templates.
+- **Sharing model ReadWrite** (org-internal) for both custom objects in v1;
+  tightening to Private requires sharing rules for the reviewer queue and is
+  deferred.
+- Lookups from Outreach_Message__c use **Restrict delete** so leads/templates
+  with sent messages cannot be deleted (reconstructability).
+
+### Consequences
+
+The webhook double-logging invariant is enforced at the database layer, not
+just in code. Template edits after approval force new version records. The
+integration user's blast radius is limited to the outreach objects. If the
+plan's section 6 taxonomy differs, the value set must be reconciled before any
+classifier training data is labeled against it.

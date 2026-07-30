@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Intent__c</fullName>
+    <label>Intent</label>
+    <description>The predicted intent this template is the approved response for.</description>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetName>Outreach_Intent</valueSetName>
+    </valueSet>
+</CustomField>

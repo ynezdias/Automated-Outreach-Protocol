@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Lead__c</fullName>
+    <label>Lead</label>
+    <description>The lead this message belongs to. Restricted delete: a lead with messages cannot be deleted.</description>
+    <type>Lookup</type>
+    <referenceTo>Lead</referenceTo>
+    <relationshipLabel>Outreach Messages</relationshipLabel>
+    <relationshipName>Outreach_Messages</relationshipName>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <required>false</required>
+</CustomField>

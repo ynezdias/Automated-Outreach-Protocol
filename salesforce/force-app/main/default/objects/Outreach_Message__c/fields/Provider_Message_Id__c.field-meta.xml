@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Provider_Message_Id__c</fullName>
+    <label>Provider Message Id</label>
+    <description>The messaging provider's message ID. Webhook idempotency key: providers retry, and a duplicate insert must fail on uniqueness rather than double-log (which causes double-replies).</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <externalId>true</externalId>
+    <unique>true</unique>
+    <caseSensitive>true</caseSensitive>
+</CustomField>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Approved_Body_Is_Immutable</fullName>
+    <active>true</active>
+    <description>Compliance control: the body of a template that is (or was, before this edit) Approved never mutates in place. Editing an approved template means creating a new version record.</description>
+    <errorConditionFormula>ISCHANGED(Body__c) &amp;&amp; ISPICKVAL(PRIORVALUE(Status__c), &quot;Approved&quot;)</errorConditionFormula>
+    <errorMessage>The body of an Approved template cannot be changed. Create a new template version instead.</errorMessage>
+</ValidationRule>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Predicted_Intent__c</fullName>
+    <label>Predicted Intent</label>
+    <description>Latest classifier-predicted intent for this lead's most recent reply.</description>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetName>Outreach_Intent</valueSetName>
+    </valueSet>
+</CustomField>

@@ -81,7 +81,7 @@ jobs:
         if: env.SFDX_AUTH_URL != ''
         run: |
           if find force-app -type f ! -name '.gitkeep' | grep -q .; then
-            sf project deploy start --dry-run --target-org ci-scratch --wait 15
+            sf project deploy start --dry-run --target-org ci-scratch --wait 30 --test-level RunLocalTests
           else
             echo "No metadata in force-app yet; nothing to validate."
           fi

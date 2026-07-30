@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <masterLabel>Outreach Intent</masterLabel>
+    <description>12-intent reply taxonomy (PROVISIONAL — plan section 6 unavailable; see ADR-011). Referenced by Lead, Outreach_Message__c, and Reply_Template__c.</description>
+    <sorted>false</sorted>
+    <customValue>
+        <fullName>Interested</fullName>
+        <default>false</default>
+        <label>Interested</label>
+    </customValue>
+    <customValue>
+        <fullName>Question</fullName>
+        <default>false</default>
+        <label>Question</label>
+    </customValue>
+    <customValue>
+        <fullName>Request_More_Info</fullName>
+        <default>false</default>
+        <label>Request More Info</label>
+    </customValue>
+    <customValue>
+        <fullName>Not_Interested</fullName>
+        <default>false</default>
+        <label>Not Interested</label>
+    </customValue>
+    <customValue>
+        <fullName>Not_Now</fullName>
+        <default>false</default>
+        <label>Not Now / Bad Timing</label>
+    </customValue>
+    <customValue>
+        <fullName>Already_Financed</fullName>
+        <default>false</default>
+        <label>Already Has Financing</label>
+    </customValue>
+    <customValue>
+        <fullName>Wrong_Person</fullName>
+        <default>false</default>
+        <label>Wrong Person</label>
+    </customValue>
+    <customValue>
+        <fullName>Referral</fullName>
+        <default>false</default>
+        <label>Referral To Someone Else</label>
+    </customValue>
+    <customValue>
+        <fullName>Opt_Out</fullName>
+        <default>false</default>
+        <label>Opt Out (guardrail-detected)</label>
+    </customValue>
+    <customValue>
+        <fullName>Legal_Escalation</fullName>
+        <default>false</default>
+        <label>Legal / Escalation (guardrail-detected)</label>
+    </customValue>
+    <customValue>
+        <fullName>Auto_Reply</fullName>
+        <default>false</default>
+        <label>Automated Reply / Out of Office</label>
+    </customValue>
+    <customValue>
+        <fullName>Unclear</fullName>
+        <default>false</default>
+        <label>Unclear / Other</label>
+    </customValue>
+</GlobalValueSet>
