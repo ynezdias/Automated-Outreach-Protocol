@@ -579,3 +579,67 @@ Swapping vendors is one new class plus a factory line. The Twilio-era names in
 tests/utilities are cosmetic debt, listed above so nobody mistakes them for
 live Twilio coupling. The unverified TextTorrent endpoint path and payload
 shape are a deploy blocker until PROVIDER.md (or vendor docs) confirms them.
+
+## ADR-017: TextTorrent verified-contract campaign — polling-only API, inbound-freshness pager
+
+### Context
+
+The provider-contract work order requires capturing TextTorrent's real wire
+contract with live credentials and reconciling `TextTorrentProvider` (ADR-016
+had pinned it to test-suite guesses). The full official API reference was
+fetched on 2026-07-30 and contradicts several assumptions:
+
+- Base URL is `https://api.texttorrent.com/api/v1`; auth is `X-API-SID` +
+  `X-API-PUBLIC-KEY` headers (not Basic/Password); 60 requests/min shared.
+- Send is two-step (`POST /inbox/chat/create` then multipart
+  `POST /inbox/chat` with a mandatory `chat_id`); the message id is integer
+  `data.id`.
+- **No webhooks, no signature scheme, no status callbacks exist anywhere in
+  the documented API.** Inbound and delivery status are polled
+  (`GET /inbox`, `GET /inbox/{chat_id}`); fetching a chat marks it read.
+- Sends are "automatically cleaned using AI" server-side (the Conflict-A
+  rewriter, on the API path), and an AI reply-generation endpoint exists
+  (`/inbox/generate/ai/response`) which is never to be called (anti-goal:
+  no LLM in the reply path).
+
+Live credentials were not found on this machine or in Secrets Manager, so no
+captures have run yet.
+
+### Decision
+
+- `docs/PROVIDER.md` is committed as a **docs-derived draft** with per-section
+  `Verified:` markers; provider Apex is deliberately NOT reconciled until
+  fixtures exist (one churn against evidence, not two against hearsay). The
+  Twilio signature fallback stays until the inbound-transport decision — its
+  removal is part of that change, not a standalone edit.
+- `research/texttorrent_capture.py` is the evidence generator. Raw captures
+  default to a directory outside the repo (real numbers and message content;
+  the editor's auto-commit has already pushed PII once). Only sanitized
+  fixtures are committed, with the sanitization mapping documented.
+- The **inbound-freshness pager** ships now because it is transport-agnostic:
+  `salesforce.inbound_gap` runs every 15 minutes, queries the system of
+  record for the newest inbound `Outreach_Message__c`, and emits
+  `Outreach/Inbound InboundGapBusinessSeconds`; the observability stack alarms
+  at >= 4 business hours, treats missing data as breaching (covers the
+  detector itself dying and the no-inbound-ever state), and pages via a new
+  SNS topic (email: ydias@fundmatellc.com — the drift alarm now pages there
+  too). Business hours are Mon-Fri 08:00-21:00 America/New_York by default,
+  matching the send window so nights and weekends cannot page; timezone and
+  hours are env-configurable.
+- Known limitation, accepted for v1: the pager assumes outreach keeps
+  generating replies during business hours. A deliberate campaign pause will
+  page after 4 business hours. Preferred over silent reply loss; revisit by
+  gating on recent outbound volume if it becomes noisy.
+
+### Pending (blocked on credentials / user decisions)
+
+- All captures in PROVIDER.md §6, including a real send to and reply from the
+  developer's own phone, and delivery-status integer semantics.
+- Whether the TextTorrent dashboard UI offers webhooks the API docs omit.
+- The inbound-transport decision if polling stands: an AWS poller upserting
+  inbound messages into Salesforce on `Provider_Message_Id__c` (recommended —
+  matches the existing AWS→Salesforce integration direction), or scheduled
+  Apex polling via Named Credential. The WO-08 webhook endpoints have no
+  caller under either polling option.
+- Byte-identity canary evidence for the AI cleaner (Conflict A); the opt-out
+  word / blocked-list endpoints feed Conflict B reconciliation.
