@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Webhook_Base_Url__c</fullName>
+    <label>Webhook Base URL</label>
+    <description>Public base URL of the webhook Site as configured in the Twilio console, up to but not including /twilio/... (e.g. https://x.my.salesforce-sites.com/services/apexrest). Twilio signs the exact URL it calls; validation reconstructs it from this value plus the request URI.</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+</CustomField>

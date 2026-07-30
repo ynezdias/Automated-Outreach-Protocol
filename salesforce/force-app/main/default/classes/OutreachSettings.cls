@@ -33,4 +33,9 @@ public with sharing class OutreachSettings {
         Outreach_Setting__mdt rec = record();
         return rec == null || rec.From_Number__c == null ? '' : rec.From_Number__c;
     }
+
+    public static String webhookBaseUrl() {
+        Outreach_Setting__mdt rec = record();
+        return rec == null || rec.Webhook_Base_Url__c == null ? '' : rec.Webhook_Base_Url__c;
+    }
 }

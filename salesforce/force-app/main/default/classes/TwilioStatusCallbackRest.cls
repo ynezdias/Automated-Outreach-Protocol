@@ -1,13 +1,11 @@
 /**
- * Twilio delivery-status webhook. Idempotent on Provider_Message_Id__c:
- * callbacks update the existing message record; a callback for an unknown SID
- * creates exactly one stub (the unique external ID field breaks ties under
- * concurrent retries), so a duplicate callback can never create a second
- * record or trigger any reply logic.
- *
- * NOTE: Twilio X-Twilio-Signature validation is a pre-production follow-up
- * (ADR-013) — the auth token lives only in the Named Credential and is not
- * readable by Apex for HMAC computation.
+ * Twilio delivery-status webhook. Every request must carry a valid
+ * X-Twilio-Signature (unsigned or invalid -> 403; fail closed when
+ * unconfigured). Idempotent on Provider_Message_Id__c: callbacks update the
+ * existing message record; a callback for an unknown SID creates exactly one
+ * stub (the unique external ID field breaks ties under concurrent retries),
+ * so a duplicate callback can never create a second record or trigger any
+ * reply logic.
  */
 @RestResource(urlMapping='/twilio/status')
 global with sharing class TwilioStatusCallbackRest {
@@ -15,7 +13,11 @@ global with sharing class TwilioStatusCallbackRest {
     global static void handleStatus() {
         RestRequest request = RestContext.request;
         RestResponse response = RestContext.response;
-        Map<String, String> form = parseForm(
+        if (!TwilioWebhook.isValidSignature(request)) {
+            response.statusCode = 403;
+            return;
+        }
+        Map<String, String> form = TwilioWebhook.parseForm(
             request.requestBody == null ? '' : request.requestBody.toString()
         );
         String sid = form.get('MessageSid');
@@ -57,19 +59,5 @@ global with sharing class TwilioStatusCallbackRest {
             }
         }
         response.statusCode = 200;
-    }
-
-    private static Map<String, String> parseForm(String body) {
-        Map<String, String> values = new Map<String, String>();
-        for (String pair : body.split('&')) {
-            List<String> parts = pair.split('=', 2);
-            if (parts.size() == 2) {
-                values.put(
-                    EncodingUtil.urlDecode(parts[0], 'UTF-8'),
-                    EncodingUtil.urlDecode(parts[1], 'UTF-8')
-                );
-            }
-        }
-        return values;
     }
 }

@@ -1,23 +1,35 @@
 /**
- * Webhook idempotency tests: providers retry; a duplicate status callback
- * must never create a second Outreach_Message__c record.
+ * Webhook idempotency and signature tests for the delivery-status callback.
  */
 @IsTest
 private class TwilioStatusCallbackRestTest {
-    private static void postCallback(String sid, String status) {
-        RestRequest request = new RestRequest();
-        request.requestUri = '/services/apexrest/twilio/status';
-        request.httpMethod = 'POST';
-        request.requestBody = Blob.valueOf(
-            'MessageSid=' + sid + '&MessageStatus=' + status + '&To=%2B16502530001'
-        );
+    private static final String URI = '/twilio/status';
+
+    private static String formBody(String sid, String status) {
+        return 'MessageSid=' + sid + '&MessageStatus=' + status + '&To=%2B16502530001';
+    }
+
+    private static void post(RestRequest request) {
         RestContext.request = request;
         RestContext.response = new RestResponse();
         TwilioStatusCallbackRest.handleStatus();
     }
 
+    private static void postSigned(String sid, String status) {
+        post(TwilioWebhookTestUtil.signedRequest(URI, formBody(sid, status)));
+    }
+
+    @IsTest
+    static void unsignedCallbackIsRejected() {
+        TwilioWebhookTestUtil.configure();
+        post(TwilioWebhookTestUtil.unsignedRequest(URI, formBody('SM_X', 'delivered')));
+        Assert.areEqual(403, RestContext.response.statusCode);
+        Assert.areEqual(0, [SELECT COUNT() FROM Outreach_Message__c]);
+    }
+
     @IsTest
     static void updatesDeliveryStatusOnExistingMessage() {
+        TwilioWebhookTestUtil.configure();
         insert new Outreach_Message__c(
             Provider_Message_Id__c = 'SM_EXISTING',
             Direction__c = 'Outbound',
@@ -25,7 +37,7 @@ private class TwilioStatusCallbackRestTest {
             Delivery_Status__c = 'queued'
         );
 
-        postCallback('SM_EXISTING', 'delivered');
+        postSigned('SM_EXISTING', 'delivered');
 
         Outreach_Message__c updated = [
             SELECT Delivery_Status__c
@@ -38,6 +50,7 @@ private class TwilioStatusCallbackRestTest {
 
     @IsTest
     static void duplicateCallbackDoesNotCreateSecondRecord() {
+        TwilioWebhookTestUtil.configure();
         insert new Outreach_Message__c(
             Provider_Message_Id__c = 'SM_DUP',
             Direction__c = 'Outbound',
@@ -45,8 +58,8 @@ private class TwilioStatusCallbackRestTest {
             Delivery_Status__c = 'queued'
         );
 
-        postCallback('SM_DUP', 'sent');
-        postCallback('SM_DUP', 'delivered'); // provider retry / next hop
+        postSigned('SM_DUP', 'sent');
+        postSigned('SM_DUP', 'delivered'); // provider retry / next hop
 
         Assert.areEqual(
             1,
@@ -63,8 +76,9 @@ private class TwilioStatusCallbackRestTest {
 
     @IsTest
     static void unknownSidCreatesExactlyOneStub() {
-        postCallback('SM_UNKNOWN', 'delivered');
-        postCallback('SM_UNKNOWN', 'delivered');
+        TwilioWebhookTestUtil.configure();
+        postSigned('SM_UNKNOWN', 'delivered');
+        postSigned('SM_UNKNOWN', 'delivered');
 
         Assert.areEqual(
             1,
@@ -75,7 +89,8 @@ private class TwilioStatusCallbackRestTest {
 
     @IsTest
     static void missingSidIsRejected() {
-        postCallback('', 'delivered');
+        TwilioWebhookTestUtil.configure();
+        post(TwilioWebhookTestUtil.signedRequest(URI, 'MessageStatus=delivered'));
         Assert.areEqual(400, RestContext.response.statusCode);
         Assert.areEqual(0, [SELECT COUNT() FROM Outreach_Message__c]);
     }

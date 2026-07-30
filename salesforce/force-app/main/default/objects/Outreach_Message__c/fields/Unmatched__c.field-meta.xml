@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Unmatched__c</fullName>
+    <label>Unmatched</label>
+    <description>Inbound message whose sender could not be matched to a Lead by normalized phone. These form the unmatched review queue — logged, never dropped.</description>
+    <type>Checkbox</type>
+    <defaultValue>false</defaultValue>
+</CustomField>

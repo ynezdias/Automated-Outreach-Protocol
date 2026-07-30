@@ -440,3 +440,50 @@ throttle is a metadata change, not a deploy. A misconfigured timezone can only
 under-send, never violate quiet hours. The callback endpoint must be fronted by
 a Site/Experience guest user at org-setup time, and signature validation must
 land before that endpoint is exposed publicly.
+
+## ADR-014: Inbound webhook — signature key storage, unmatched queue, no classifier
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The inbound path must validate X-Twilio-Signature on every request, but HMAC
+validation needs the signing key readable by Apex — Named Credentials cannot
+serve key material, and CLAUDE.md forbids secrets in code or Custom Settings.
+Sites and guest profiles are org-bound and cannot fully ship as metadata.
+
+### Decision
+
+- **Signing key in protected custom metadata** (`Outreach_Secret__mdt`): the
+  platform-sanctioned store that is neither code nor Custom Settings. The
+  validator fails closed — blank token or blank
+  `Outreach_Setting__mdt.Webhook_Base_Url__c` rejects every request with 403.
+  The callout auth token itself still lives only in the Named Credential; the
+  same value is duplicated into the protected CMT purely as the HMAC key.
+  Signature enforcement now also covers the status callback, closing the
+  ADR-013 deferred item.
+- **Shared plumbing** in `TwilioWebhook`: signature check, form parsing, and
+  US-region E.164 phone normalization mirroring `src/cleansing/normalize.py`.
+- **Idempotent inserts** on `Provider_Message_Id__c` (query-first plus
+  unique-index race fallback); a provider retry can never double-log.
+- **Unmatched senders are queued, never dropped**: the message is inserted
+  with `Unmatched__c = true` and no Lead; reviewers work that flag. Matching
+  is exact on normalized E.164 against `Lead.Phone` (the sync writes E.164);
+  multiple matches take the most recently created Lead.
+- **Matched leads** get `Outreach_Status__c = 'Replied'` and `Last_Reply_At__c`
+  stamped; the endpoint answers empty TwiML so Twilio does not error.
+- **No classifier call** — intentional: replies are answered manually to
+  generate labeled training data.
+- **Site setup and live-phone verification are a runbook**
+  (`docs/RUNBOOK_inbound.md`): Site domains and guest profiles are org
+  configuration; the acceptance's live inbound test runs post-deploy per the
+  runbook.
+
+### Consequences
+
+Webhooks are authenticated everywhere with zero fail-open paths, at the cost
+of the auth token existing in two places (Named Credential for callouts,
+protected CMT for HMAC) — rotating it means updating both. Manually created
+leads with non-E.164 phones will land in the unmatched queue until phone
+hygiene or fuzzier matching improves.

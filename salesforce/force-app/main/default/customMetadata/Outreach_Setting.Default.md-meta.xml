@@ -14,4 +14,8 @@
         <field>From_Number__c</field>
         <value xsi:nil="true"/>
     </values>
+    <values>
+        <field>Webhook_Base_Url__c</field>
+        <value xsi:nil="true"/>
+    </values>
 </CustomMetadata>
