@@ -1,0 +1,6 @@
+# Ignore all non-source files
+package.xml
+**/jsconfig.json
+**/.eslintrc.json
+**/__tests__/**
+.gitkeep
