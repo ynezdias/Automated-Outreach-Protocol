@@ -22,3 +22,7 @@ salesforce/.localdevserver/
 .vscode/
 .idea/
 .DS_Store
+
+# Local artifacts and data files — never commit
+.coverage
+texttorrent_conversations_last30d.csv
