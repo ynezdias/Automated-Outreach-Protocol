@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python-checks:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: uv sync
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: Typecheck
+        run: uv run mypy
+      - name: Unit tests
+        run: uv run pytest
+
+  cdk-synth:
+    name: CDK synth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          uv sync
+          npm install -g aws-cdk
+      - name: Synthesize stacks
+        run: cdk synth --quiet
+      - name: Verify four stacks
+        run: |
+          count=$(ls cdk.out/*.template.json | wc -l)
+          echo "Synthesized $count stacks"
+          test "$count" -eq 4
+
+  salesforce-validate:
+    name: Salesforce deploy validate (scratch org)
+    runs-on: ubuntu-latest
+    env:
+      SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+    defaults:
+      run:
+        working-directory: salesforce
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip notice (no Dev Hub secret)
+        if: env.SFDX_AUTH_URL == ''
+        run: echo "SFDX_AUTH_URL secret not configured; skipping scratch org validation."
+      - uses: actions/setup-node@v4
+        if: env.SFDX_AUTH_URL != ''
+        with:
+          node-version: "20"
+      - name: Install Salesforce CLI
+        if: env.SFDX_AUTH_URL != ''
+        run: npm install -g @salesforce/cli
+      - name: Authenticate Dev Hub
+        if: env.SFDX_AUTH_URL != ''
+        run: |
+          echo "$SFDX_AUTH_URL" > sfdx_auth.txt
+          sf org login sfdx-url --sfdx-url-file sfdx_auth.txt --set-default-dev-hub --alias devhub
+          rm sfdx_auth.txt
+      - name: Create scratch org
+        if: env.SFDX_AUTH_URL != ''
+        run: sf org create scratch --definition-file config/project-scratch-def.json --alias ci-scratch --set-default --duration-days 1 --wait 15
+      - name: Validate deploy
+        if: env.SFDX_AUTH_URL != ''
+        run: |
+          if find force-app -type f ! -name '.gitkeep' | grep -q .; then
+            sf project deploy start --dry-run --target-org ci-scratch --wait 15
+          else
+            echo "No metadata in force-app yet; nothing to validate."
+          fi
+      - name: Delete scratch org
+        if: always() && env.SFDX_AUTH_URL != ''
+        run: sf org delete scratch --target-org ci-scratch --no-prompt

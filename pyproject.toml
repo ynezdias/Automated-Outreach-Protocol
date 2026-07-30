@@ -1,0 +1,37 @@
+[project]
+name = "automated-outreach-protocol"
+version = "0.1.0"
+description = "Automated outreach protocol: AWS CDK infrastructure and Salesforce integration."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "aws-cdk-lib>=2.170",
+    "constructs>=10.0",
+    "detect-secrets>=1.5",
+    "mypy>=1.13",
+    "nodejs-wheel-binaries>=24.16.0",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["infra", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
