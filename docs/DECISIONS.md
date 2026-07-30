@@ -336,3 +336,50 @@ just in code. Template edits after approval force new version records. The
 integration user's blast radius is limited to the outreach objects. If the
 plan's section 6 taxonomy differs, the value set must be reconciled before any
 classifier training data is labeled against it.
+
+## ADR-012: Salesforce sync — JWT via pure-python rsa, fake-first integration tests
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The sync layer needs RS256 signing for the JWT Bearer Flow, and the acceptance
+test calls for a scratch org. `cryptography` (the usual RS256 provider) has no
+Windows-ARM64 wheel, and a real scratch-org run requires a Connected App with a
+certificate that does not exist yet.
+
+### Decision
+
+- **JWT signing uses the pure-python `rsa` package.** The Secrets Manager
+  secret (`outreach/salesforce/jwt`) stores JSON with `client_id`, `username`,
+  `login_url`, and `private_key` — the key in **PKCS#1 PEM** ("BEGIN RSA
+  PRIVATE KEY", `openssl rsa -traditional`), which `rsa` can load. Tokens are
+  minted per invocation; no refresh tokens, no password flow anywhere.
+- **HTTP goes through an injectable transport** (stdlib urllib by default, no
+  requests dependency). 429/503 retry with exponential backoff (1/2/4/8s, five
+  attempts); every response's `Sforce-Limit-Info` header is captured and
+  surfaced to CloudWatch as `ApiUsagePercent`.
+- **One Bulk API 2.0 upsert job per 10,000 records** on
+  `Outreach_External_Id__c`. A job ending in any state but JobComplete raises
+  (fail loud); per-record failures are fetched from `failedResults` and written
+  verbatim to `staging/sync-failures/<run_id>/<job_id>.csv`.
+- **Acceptance tests run against an in-memory FakeSalesforce** that verifies
+  the JWT signature with the real public key and implements true upsert
+  semantics; the identical flow runs against a real scratch org when
+  `SALESFORCE_SYNC_TEST_SECRET` is set (requires a Connected App + certificate
+  and the JWT pre-authorized for the integration user — manual setup, then CI).
+- **Reconciliation** compares distinct external IDs in `staging/cleansed/`
+  (runs overlap; upsert dedupes) against Salesforce leads with an external ID,
+  publishing `ReconciliationDriftPercent` daily; the observability stack alarms
+  above 1%, and missing data breaches (a silent reconciler is an incident).
+- Sync runs as the final Step Functions state after write_staging; reconcile is
+  EventBridge-scheduled daily.
+
+### Consequences
+
+Everything runs and is fully tested on any platform without native crypto; the
+scratch-org path exercises byte-identical code once credentials exist. The
+PKCS#1 key format is a hard requirement operators must follow when creating the
+secret. Reconciliation counts leads, not field-level drift — that is a later
+concern.

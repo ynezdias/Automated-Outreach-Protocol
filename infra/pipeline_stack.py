@@ -17,13 +17,18 @@ from typing import Any
 from aws_cdk import Duration, Stack
 from aws_cdk import aws_events as events
 from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_secretsmanager as secretsmanager
 from aws_cdk import aws_stepfunctions as sfn
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
 RAW_ENRICHMENT_PREFIX = "raw/enrichment/"
+SALESFORCE_SECRET_NAME = "outreach/salesforce/jwt"
+SYNC_HANDLER = "salesforce.sync.handler"
+RECONCILE_HANDLER = "salesforce.reconcile.handler"
 
 #: Pipeline steps in execution order: (construct name, Lambda handler module).
 STEPS = (
@@ -52,33 +57,66 @@ class PipelineStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        invokes: list[tasks.LambdaInvoke] = []
-        for name, module in STEPS:
+        salesforce_secret = secretsmanager.Secret.from_secret_name_v2(
+            self, "SalesforceJwtSecret", SALESFORCE_SECRET_NAME
+        )
+
+        def step_function(name: str, handler: str, *, timeout_minutes: int = 5) -> lambda_.Function:
             function = lambda_.Function(
                 self,
                 f"{name}Fn",
                 runtime=lambda_.Runtime.PYTHON_3_12,
                 code=lambda_.Code.from_asset(_SRC_PATH),
-                handler=f"{module}.handler",
-                timeout=Duration.minutes(5),
+                handler=handler,
+                timeout=Duration.minutes(timeout_minutes),
                 memory_size=1024,
                 environment={
                     "DATA_BUCKET": data_bucket.bucket_name,
                     "COOLDOWN_DAYS": "90",
                     # Twilio Lookup costs $0.01/query — off until a human enables it.
                     "TWILIO_LOOKUP_ENABLED": "false",
+                    "SALESFORCE_SECRET_ID": SALESFORCE_SECRET_NAME,
                 },
             )
             data_bucket.grant_read_write(function)
+            return function
+
+        invokes: list[tasks.LambdaInvoke] = []
+        for name, module in STEPS:
             invokes.append(
                 tasks.LambdaInvoke(
-                    self, f"{name}Task", lambda_function=function, payload_response_only=True
+                    self,
+                    f"{name}Task",
+                    lambda_function=step_function(name, f"{module}.handler"),
+                    payload_response_only=True,
                 )
             )
+
+        # Final state: push the cleansed batch to Salesforce (Bulk API 2.0 upsert).
+        metrics_policy = iam.PolicyStatement(actions=["cloudwatch:PutMetricData"], resources=["*"])
+        sync_fn = step_function("SyncToSalesforce", SYNC_HANDLER, timeout_minutes=15)
+        salesforce_secret.grant_read(sync_fn)
+        sync_fn.add_to_role_policy(metrics_policy)
+        invokes.append(
+            tasks.LambdaInvoke(
+                self, "SyncToSalesforceTask", lambda_function=sync_fn, payload_response_only=True
+            )
+        )
 
         chain = sfn.Chain.start(invokes[0])
         for invoke in invokes[1:]:
             chain = chain.next(invoke)
+
+        # Daily reconciliation: lake vs Salesforce counts; alarmed in observability.
+        reconcile_fn = step_function("Reconcile", RECONCILE_HANDLER, timeout_minutes=15)
+        salesforce_secret.grant_read(reconcile_fn)
+        reconcile_fn.add_to_role_policy(metrics_policy)
+        events.Rule(
+            self,
+            "DailyReconciliation",
+            schedule=events.Schedule.rate(Duration.days(1)),
+            targets=[targets.LambdaFunction(reconcile_fn)],
+        )
         self.state_machine = sfn.StateMachine(
             self,
             "CleansingStateMachine",

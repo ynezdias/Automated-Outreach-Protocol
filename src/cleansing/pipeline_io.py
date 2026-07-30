@@ -43,6 +43,20 @@ def write_ndjson(s3: Any, bucket: str, key: str, rows: list[Row]) -> None:
     s3.put_object(Bucket=bucket, Key=key, Body=body.encode(), ContentType="application/x-ndjson")
 
 
+def list_keys(s3: Any, bucket: str, prefix: str) -> list[str]:
+    keys: list[str] = []
+    token: str | None = None
+    while True:
+        kwargs: dict[str, Any] = {"Bucket": bucket, "Prefix": prefix}
+        if token is not None:
+            kwargs["ContinuationToken"] = token
+        response = s3.list_objects_v2(**kwargs)
+        keys += [entry["Key"] for entry in response.get("Contents", [])]
+        if not response.get("IsTruncated"):
+            return keys
+        token = response["NextContinuationToken"]
+
+
 def step_key(run_id: str, name: str) -> str:
     return f"staging/pipeline/{run_id}/{name}"
 
