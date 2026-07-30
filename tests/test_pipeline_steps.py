@@ -125,8 +125,6 @@ def test_suppress_defaults_as_of_to_now(s3: FakeS3Client) -> None:
 
 def test_cooldown_days_env_override(s3: FakeS3Client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("COOLDOWN_DAYS", "5")
-    event = _seed_step_input(
-        s3, [_valid_row(last_contacted_at="2026-07-20T00:00:00+00:00")]
-    )
+    event = _seed_step_input(s3, [_valid_row(last_contacted_at="2026-07-20T00:00:00+00:00")])
     out = suppress.handler({**event, "as_of": "2026-07-30T00:00:00+00:00"})
     assert (out["rows_out"], out["cooldown_excluded"]) == (1, 0)  # 10 days > 5-day window

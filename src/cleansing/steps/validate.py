@@ -69,9 +69,7 @@ def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
                     continue
                 row = {**row, "email": None}
         line_type = (
-            line_type_lookup(row["phone"])
-            if lookup_enabled and row["phone"] is not None
-            else None
+            line_type_lookup(row["phone"]) if lookup_enabled and row["phone"] is not None else None
         )
         kept.append({**row, "line_type": line_type})
     out_key = pipeline_io.step_key(run_id, "03_validated.ndjson")

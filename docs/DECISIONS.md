@@ -238,3 +238,51 @@ No lost opt-outs under concurrency and full auditability of every suppression.
 Reads can be up to 30s stale — within the 60s bound but not instantaneous.
 Plus-addressed variants of an opted-out mailbox are all suppressed. The fake S3
 client must be kept faithful to the real API surface it mimics (put/get/list).
+
+## ADR-010: Cleansing pipeline shape — S3-chained step Lambdas, quarantine per step
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The cleansing pipeline (schema validate → normalize → validate → dedupe →
+suppress → assign ID → write staging) must let any step be rerun in isolation,
+and several details were not fixed by the work order: where intermediates live,
+how quarantine works after step 1, what Twilio line type is used for, and where
+"last contacted" comes from for the cooldown rule.
+
+### Decision
+
+- Steps exchange newline-delimited JSON under `staging/pipeline/<run_id>/`
+  (inspectable intermediates); each handler's return value is the next
+  handler's event, so Step Functions chains them with `payload_response_only`
+  and a human can rerun any step by hand-crafting the same shape.
+- Every filtering step (1-3) writes its own quarantine CSV under
+  `raw/quarantine/<run_id>/<step>.csv` with a `reason` column; step 5 writes
+  excluded rows (suppressed/cooldown) to an audit ndjson rather than dropping
+  them silently.
+- Twilio Lookup is gated by `TWILIO_LOOKUP_ENABLED` (default **false** — it
+  costs $0.01/query) and only ever annotates `line_type`; dropping landlines is
+  a downstream human decision. An email domain with no MX is nulled, and the
+  row is quarantined only if that leaves no identifier (fail toward review, not
+  toward sending).
+- Cooldown uses the `last_contacted_at` column supplied in the enrichment feed
+  (Salesforce is the source of that value), compared against `as_of` (event
+  override for reproducible reruns, else now) with `COOLDOWN_DAYS` env, default 90.
+- The Salesforce external ID is UUIDv5 over `"<e164-phone>|<email>"` with a
+  fixed project namespace — stable across runs; the namespace must never change.
+- The trigger is EventBridge (bucket notifications enabled) on Object Created
+  under `raw/enrichment/`, targeting the state machine.
+- Lambda code ships as a source asset; bundling third-party deps (polars,
+  phonenumbers, dnspython) is a deploy-time follow-up before first real deploy.
+- moto is installed via an environment marker (`platform_machine != 'ARM64'`):
+  the integration test uses moto in CI and the in-memory fake locally (ADR-009).
+
+### Consequences
+
+Any step can be rerun from its predecessor's output object. Quarantine and
+exclusion are fully auditable per run. The pipeline never deploys with paid
+lookups silently enabled. Until dependency bundling lands, deploying the stack
+produces Lambdas that cannot import their dependencies — synth and tests are
+the current acceptance surface.

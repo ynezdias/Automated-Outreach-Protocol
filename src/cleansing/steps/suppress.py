@@ -26,9 +26,7 @@ def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
     bucket, run_id = event["bucket"], event["run_id"]
     rows = pipeline_io.read_ndjson(s3, bucket, event["key"])
     store = SuppressionStore(bucket=bucket, s3_client=s3)
-    as_of = (
-        datetime.fromisoformat(event["as_of"]) if "as_of" in event else datetime.now(UTC)
-    )
+    as_of = datetime.fromisoformat(event["as_of"]) if "as_of" in event else datetime.now(UTC)
     window = timedelta(days=int(os.environ.get("COOLDOWN_DAYS", "90")))
     kept: list[pipeline_io.Row] = []
     excluded: list[pipeline_io.Row] = []

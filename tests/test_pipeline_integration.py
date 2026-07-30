@@ -88,13 +88,12 @@ def build_fixture() -> list[dict[str, str]]:
     # valid phone, email domain without MX: email nulled at step 3, row survives
     rows += [_row(i, email=f"user{i}@{BAD_MX_DOMAIN}") for i in range(840, 845)]
     # contacted long ago — outside the cooldown window
-    rows += [
-        _row(i, last_contacted_at="2026-01-01T00:00:00+00:00") for i in range(845, 850)
-    ]
+    rows += [_row(i, last_contacted_at="2026-01-01T00:00:00+00:00") for i in range(845, 850)]
     rows += [_row(i) for i in range(850, 870)]  # phone pre-suppressed
     rows += [
         _row(i, last_contacted_at="2026-07-20T00:00:00+00:00") for i in range(870, 880)
     ]  # inside 90-day cooldown
+
     # 50 duplicates of rows 0..49, enriched one day earlier and in a messier
     # phone format: 25 placed before their newer counterpart, 25 after.
     def dup(i: int) -> dict[str, str]:
@@ -141,9 +140,7 @@ def s3(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
             yield client
     else:
         client = FakeS3Client()
-        monkeypatch.setattr(
-            "cleansing.pipeline_io.boto3.client", lambda service: client
-        )
+        monkeypatch.setattr("cleansing.pipeline_io.boto3.client", lambda service: client)
         monkeypatch.setattr("suppression.store.boto3.client", lambda service: client)
         yield client
 
@@ -197,9 +194,9 @@ def test_pipeline_end_to_end(pipeline_env: Any) -> None:
     deduped = pipeline_io.read_ndjson(s3, BUCKET, out4["key"])
     by_phone = {r["phone"]: r for r in deduped if r["phone"]}
     for i in (0, 30, 49):
-        assert by_phone[_phone(i)]["enriched_at"] == (
-            ENRICHED_BASE + timedelta(minutes=i)
-        ).isoformat()
+        assert (
+            by_phone[_phone(i)]["enriched_at"] == (ENRICHED_BASE + timedelta(minutes=i)).isoformat()
+        )
 
     out5 = suppress.handler({**out4, "as_of": AS_OF.isoformat()})
     assert (out5["rows_in"], out5["rows_out"]) == (880, 850)
