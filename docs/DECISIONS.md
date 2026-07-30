@@ -116,8 +116,8 @@ project, split along deployment and ownership boundaries.
 ### Decision
 
 Use AWS CDK (Python, `aws-cdk-lib` v2) with four stacks: **data**, **pipeline**,
-**inference**, and **observability**, defined under `infra/stacks/` and wired in
-`infra/app.py`.
+**inference**, and **observability**, defined as `infra/<name>_stack.py` modules and
+wired in `infra/app.py`.
 
 ### Consequences
 
@@ -166,3 +166,31 @@ Ruff and detect-secrets (with a committed `.secrets.baseline`) on every commit.
 Broken code and leaked secrets are caught before merge. Contributors run
 `uv run pre-commit install` once per clone; the Salesforce job self-skips when the
 Dev Hub secret is absent so forks and early PRs still pass.
+
+## ADR-008: Dedicated Object Lock bucket for the audit zone
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The audit zone requires S3 Object Lock in compliance mode with a 7-year default
+retention. Object Lock is a bucket-level property that must be set at bucket
+creation and cannot be scoped to a prefix; enabling it on the shared data bucket
+would make every zone (raw/, staging/, etc.) immutable for 7 years.
+
+### Decision
+
+Split storage into two buckets in the data stack: a data bucket holding the
+raw/, staging/, suppression/, conversations/, training/, and models/ prefixes,
+and a dedicated audit bucket with Object Lock in compliance mode
+(7-year default retention), its own customer-managed KMS key, and no lifecycle
+expiration. Audit objects are still written under an audit/ key prefix so the
+logical zone layout is uniform.
+
+### Consequences
+
+Audit records are immutable and cannot be shortened or deleted even by the root
+account until retention lapses — 7 years is a floor, so miswritten objects also
+persist. Consumers must address the audit bucket by its own name/ARN rather than
+a prefix on the data bucket.

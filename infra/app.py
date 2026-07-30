@@ -2,7 +2,10 @@
 
 import aws_cdk as cdk
 
-from infra.stacks import DataStack, InferenceStack, ObservabilityStack, PipelineStack
+from infra.data_stack import DataStack
+from infra.inference_stack import InferenceStack
+from infra.observability_stack import ObservabilityStack
+from infra.pipeline_stack import PipelineStack
 
 
 def build_app() -> cdk.App:
