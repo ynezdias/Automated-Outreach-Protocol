@@ -9,9 +9,9 @@ Secret JSON shape (Secrets Manager)::
     {"client_id": "<consumer key>", "username": "<integration user>",
      "login_url": "https://login.salesforce.com", "private_key": "<PKCS#1 PEM>"}
 
-The key must be PKCS#1 ("BEGIN RSA PRIVATE KEY", e.g. ``openssl rsa
--traditional``): signing uses the pure-python ``rsa`` package because
-``cryptography`` has no Windows-ARM64 wheel (ADR-012).
+The key must be in PKCS#1 PEM form (the traditional RSA format, e.g. the
+output of ``openssl rsa -traditional``): signing uses the pure-python ``rsa``
+package because ``cryptography`` has no Windows-ARM64 wheel (ADR-012).
 """
 
 import base64
