@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Per_Number_Hourly_Limit__c</fullName>
+    <label>Per Number Hourly Limit</label>
+    <description>Max outbound messages per sending number per hour. Defaults well under starter 10DLC daily tiers.</description>
+    <type>Number</type>
+    <precision>4</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+</CustomField>

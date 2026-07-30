@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Send_Error__c</fullName>
+    <label>Send Error</label>
+    <description>Error detail when a send attempt failed. Failures are logged, never dropped.</description>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+</CustomField>

@@ -383,3 +383,60 @@ scratch-org path exercises byte-identical code once credentials exist. The
 PKCS#1 key format is a hard requirement operators must follow when creating the
 secret. Reconciliation counts leads, not field-level drift — that is a later
 concern.
+
+## ADR-013: Send path — check ordering, throttle config, callback idempotency
+
+- **Date:** 2026-07-30
+- **Status:** Accepted
+
+### Context
+
+The send path's order of operations is fixed (suppression -> quiet hours ->
+rate limit -> send -> log), but several platform constraints and unspecified
+details needed decisions: Apex forbids callouts after DML, scheduled Flows
+cannot make callouts in their own transaction, Twilio needs the Account SID in
+the URL, and quiet-hours timezone handling has a dangerous platform default.
+
+### Decision
+
+- **Ordering**: enforced per lead inside `OutreachSendService.sendBatch`.
+  Because callouts must precede DML, all sends happen first and all logging DML
+  commits at the end of the transaction; the decision order per lead is exactly
+  the mandated one, verified by tests (suppressed+unknown-tz -> `suppressed`;
+  unknown-tz+zero-limit -> `unknown_timezone`).
+- **Secrets**: the Twilio auth token lives ONLY in the `Twilio` Named
+  Credential (Password protocol; admin enters credentials post-deploy). The
+  Account SID and From number — identifiers, not secrets — live in
+  `Outreach_Setting__mdt`, alongside `Per_Number_Hourly_Limit__c`
+  (default 50/hour, well under starter 10DLC daily tiers even at 24h).
+- **Quiet hours fail closed**: 8am-9pm local from `Quiet_Hours_Timezone__c`.
+  Apex's `TimeZone.getTimeZone` silently returns GMT for unknown ids, so the
+  service rejects any id that does not round-trip — blank, invalid, or
+  unrecognized timezones never send.
+- **Flow -> Queueable**: the schedule-triggered Flow (daily, Leads with
+  `Outreach_Status__c = 'Ready'`) calls an invocable that enqueues a Queueable
+  with `Database.AllowsCallouts`. Callouts are capped at 90/run (platform limit
+  100); overflow leads return `deferred` and remain Ready for the next run.
+  Daily is a Flow scheduling limitation — sub-daily cadence needs Scheduled
+  Apex later.
+- **Every attempt is logged** to Outreach_Message__c: successes with the Twilio
+  SID in `Provider_Message_Id__c`, failures with `Status__c='Failed'` and the
+  error in `Send_Error__c`. Failed sends leave the lead Ready.
+- **Callback idempotency**: the Apex REST endpoint (`/twilio/status`) updates
+  `Delivery_Status__c` keyed on `Provider_Message_Id__c`; unknown SIDs insert
+  exactly one stub (the unique external ID breaks concurrent-retry races).
+  `Delivery_Status__c` is Text, not a restricted picklist, so a novel provider
+  status can never fail the webhook.
+- **Deferred before production**: Twilio `X-Twilio-Signature` validation on the
+  callback endpoint (the auth token is locked inside the Named Credential and
+  unavailable to Apex for HMAC), and first-touch template selection is
+  name-based (`Name='First Touch'`, highest Approved version) pending the
+  template-selection design.
+
+### Consequences
+
+No credential material exists in code, metadata, or Custom Settings. The
+throttle is a metadata change, not a deploy. A misconfigured timezone can only
+under-send, never violate quiet hours. The callback endpoint must be fronted by
+a Site/Experience guest user at org-setup time, and signature validation must
+land before that endpoint is exposed publicly.

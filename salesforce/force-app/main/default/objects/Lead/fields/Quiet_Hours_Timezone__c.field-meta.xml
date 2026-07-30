@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Quiet_Hours_Timezone__c</fullName>
+    <label>Quiet Hours Timezone</label>
+    <description>IANA timezone of the recipient (e.g. America/New_York). Quiet hours (8am-9pm local) are enforced against this before every send; if unknown or invalid, we do NOT send.</description>
+    <type>Text</type>
+    <length>64</length>
+    <required>false</required>
+</CustomField>

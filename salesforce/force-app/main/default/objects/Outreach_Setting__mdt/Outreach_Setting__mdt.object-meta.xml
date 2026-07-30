@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Outreach Setting</label>
+    <pluralLabel>Outreach Settings</pluralLabel>
+    <description>Non-secret outreach configuration. Secrets (the Twilio auth token) live ONLY in the Twilio Named Credential — never here, never in Custom Settings.</description>
+    <visibility>Public</visibility>
+</CustomObject>

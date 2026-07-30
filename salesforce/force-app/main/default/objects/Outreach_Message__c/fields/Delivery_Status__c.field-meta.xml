@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Delivery_Status__c</fullName>
+    <label>Delivery Status</label>
+    <description>Provider-reported delivery status (Twilio status callbacks), updated idempotently on Provider_Message_Id__c. Text rather than restricted picklist so an unexpected provider status can never fail the callback.</description>
+    <type>Text</type>
+    <length>40</length>
+    <required>false</required>
+</CustomField>

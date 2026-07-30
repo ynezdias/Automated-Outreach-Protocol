@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Twilio_Account_SID__c</fullName>
+    <label>Twilio Account SID</label>
+    <description>Account identifier used in the callout path. Not a secret; the auth token is in the Named Credential.</description>
+    <type>Text</type>
+    <length>64</length>
+    <required>false</required>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+</CustomField>
