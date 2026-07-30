@@ -26,7 +26,7 @@ from aws_cdk import aws_stepfunctions_tasks as tasks
 from constructs import Construct
 
 RAW_ENRICHMENT_PREFIX = "raw/enrichment/"
-SALESFORCE_SECRET_NAME = "outreach/salesforce/jwt"
+SALESFORCE_SECRET_NAME = "outreach/salesforce/jwt"  # pragma: allowlist secret
 SYNC_HANDLER = "salesforce.sync.handler"
 RECONCILE_HANDLER = "salesforce.reconcile.handler"
 
