@@ -69,6 +69,7 @@ class DataStack(Stack):
             encryption_key=data_key,
             bucket_key_enabled=True,
             versioned=True,
+            event_bridge_enabled=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
             removal_policy=RemovalPolicy.RETAIN,

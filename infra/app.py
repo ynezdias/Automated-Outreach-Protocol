@@ -11,8 +11,8 @@ from infra.pipeline_stack import PipelineStack
 def build_app() -> cdk.App:
     """Construct the CDK app with all stacks."""
     app = cdk.App()
-    DataStack(app, "OutreachDataStack")
-    PipelineStack(app, "OutreachPipelineStack")
+    data = DataStack(app, "OutreachDataStack")
+    PipelineStack(app, "OutreachPipelineStack", data_bucket=data.data_bucket)
     InferenceStack(app, "OutreachInferenceStack")
     ObservabilityStack(app, "OutreachObservabilityStack")
     return app

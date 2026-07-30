@@ -41,6 +41,14 @@ def normalize_phone(raw: str | None, *, default_region: str = "US") -> str | Non
     return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
 
 
+def normalize_company(raw: str | None) -> str | None:
+    """Return ``raw`` NFKC-folded with whitespace collapsed, or None if empty."""
+    if raw is None:
+        return None
+    collapsed = " ".join(_clean(raw).split())
+    return collapsed or None
+
+
 def normalize_email(raw: str | None) -> str | None:
     """Return the canonical form of ``raw``, or None if it is not a valid address."""
     if raw is None:
