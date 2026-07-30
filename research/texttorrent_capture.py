@@ -197,8 +197,9 @@ def main() -> None:
     cap = Capture(args.out, sid, public_key)
     print(f"Capturing to {args.out}")
 
-    cap.call("auth_me", "GET", "/user/auth/me")
-    cap.call("unauthenticated", "GET", "/user/auth/me", authenticated=False)
+    # Live-verified 2026-07-30: this route is POST; GET returns a router error.
+    cap.call("auth_me", "POST", "/user/auth/me")
+    cap.call("unauthenticated", "POST", "/user/auth/me", authenticated=False)
     numbers = cap.call("active_numbers", "GET", "/inbox/numbers/active")
     cap.call("inbox_list", "GET", "/inbox?limit=10")
 

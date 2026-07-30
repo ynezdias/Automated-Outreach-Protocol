@@ -24,8 +24,18 @@
   {"code": 200, "success": true, "message": "…", "data": {…}, "errors": null}
   ```
 
-- Rate limit: **60 requests/minute** account-wide → `429` + `Retry-After`
-  header. This budget is shared by sends AND any inbound polling.
+- Rate limit: the docs say **60 requests/minute**, but the account object
+  carries the truth — ours is **500/min** (`api_requests_per_minute`), with a
+  **10,000 SMS/day** cap (`daily_sms_limit`). Exceeding → `429` +
+  `Retry-After`. One budget shared by sends AND all polling.
+
+**Live-verified 2026-07-30** (ad-hoc calls with the real credentials; formal
+fixtures still pending): the header pair authenticates; `/user/auth/me` is
+**POST**, not GET — unknown method/route errors return a Laravel-style
+`{"message": ...}` (or an HTML page), NOT the standard envelope, so clients
+must tolerate both. The account also enforces a vendor-side send window
+(`message_time_restriction`: 06:00–22:00 America/New_York) — our own 8am–9pm
+recipient-local quiet hours remain the governing control.
 
 Salesforce consequence (on reconciliation): a Named Credential with `Password`
 protocol cannot inject these two headers — the credential must move to custom
@@ -111,9 +121,18 @@ value set and transition timing must come from poll captures.
 
 - Opt-out words: `GET/POST/PUT /contact/opt-out-word`, bulk delete, export.
   Matching is case-insensitive on incoming messages and auto-blocks senders.
-- Blocked list: `GET /contact/blocked-list`, add, `/remove`, export. Blocked
-  contacts receive nothing (campaigns, automations, replies).
+  Deleting all opt-out words would effectively disable their auto-handling
+  (deliberately NOT done — ADR-019).
+- Blocked list: `GET /contact/blocked-list/` (paginated; `added_by` filter
+  distinguishes `auto` opt-out-word blocks from `manual` ones; entries carry
+  `number` in E.164), `POST /contact/blocked-list/` with
+  `{"numbers": ["<10 digits, no +1>"]}`, `/remove`, export. Blocked contacts
+  receive nothing (campaigns, automations, replies). Account holds ~10,487
+  entries as of 2026-07-30.
 - Chat create rejects blacklisted contacts (§2.1) — their side of suppression.
+- Consumed by `src/texttorrent/reconcile.py` (nightly zero-tolerance
+  reconciliation, ADR-019) and `src/texttorrent/canary.py` (daily AI-rewriter
+  byte-identity canary, ADR-018).
 
 ## 6. Capture checklist
 
