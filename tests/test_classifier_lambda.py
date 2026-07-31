@@ -1,4 +1,9 @@
-"""Tests for the classify Lambda adapter: auth, routing, fail-closed, logging."""
+"""Tests for the classify Lambda adapter: auth, routing, fail-closed, logging.
+
+Two bearer tokens exist (owner + manager secrets) so a credential can be
+revoked independently; either authenticates, and the secret NAME — never the
+value — is logged on every request.
+"""
 
 import base64
 import hashlib
@@ -11,13 +16,16 @@ import pytest
 from classifier import lambda_api
 from classifier.handler import rule_set_hash
 
-TOKEN = "unit-test-classify-token"  # pragma: allowlist secret
-SECRET_ID = "outreach/classify/token"  # pragma: allowlist secret
+OWNER_SECRET = "outreach/classify/token"  # pragma: allowlist secret
+MANAGER_SECRET = "outreach/classify/token-manager"  # pragma: allowlist secret
+TOKENS = {
+    OWNER_SECRET: "unit-test-owner-token",  # pragma: allowlist secret
+    MANAGER_SECRET: "unit-test-manager-token",  # pragma: allowlist secret
+}
 
 
 class FakeSecrets:
-    def __init__(self, token: str, fail: bool = False) -> None:
-        self.token = token
+    def __init__(self, fail: bool = False) -> None:
         self.fail = fail
         self.calls = 0
 
@@ -25,16 +33,15 @@ class FakeSecrets:
         self.calls += 1
         if self.fail:
             raise RuntimeError("secretsmanager down")
-        assert SecretId == SECRET_ID
-        return {"SecretString": self.token}
+        return {"SecretString": TOKENS[SecretId]}
 
 
 @pytest.fixture
 def secrets_env(monkeypatch: pytest.MonkeyPatch) -> FakeSecrets:
-    fake = FakeSecrets(TOKEN)
+    fake = FakeSecrets()
     monkeypatch.setattr(lambda_api, "_token_cache", None)
     monkeypatch.setattr("classifier.lambda_api.boto3.client", lambda service: fake)
-    monkeypatch.setenv(lambda_api.TOKEN_SECRET_ENV, SECRET_ID)
+    monkeypatch.setenv(lambda_api.TOKEN_SECRETS_ENV, f"{OWNER_SECRET}, {MANAGER_SECRET}")
     return fake
 
 
@@ -42,7 +49,7 @@ def url_event(
     method: str = "POST",
     path: str = "/v1/classify",
     body: str | None = None,
-    token: str | None = TOKEN,
+    token: str | None = TOKENS[OWNER_SECRET],
     b64: bool = False,
 ) -> dict[str, Any]:
     headers: dict[str, str] = {}
@@ -79,6 +86,11 @@ def test_health_reports_the_same_rule_set_hash(secrets_env: FakeSecrets) -> None
     assert payload == {"version": "rules-v1", "rule_set_hash": rule_set_hash()}
 
 
+def test_either_token_authenticates(secrets_env: FakeSecrets) -> None:
+    for token in TOKENS.values():
+        assert call(url_event(method="GET", path="/health", token=token))[0] == 200
+
+
 def test_missing_or_wrong_token_is_401(secrets_env: FakeSecrets) -> None:
     assert call(url_event(token=None))[0] == 401
     assert call(url_event(token="wrong"))[0] == 401
@@ -88,24 +100,23 @@ def test_missing_or_wrong_token_is_401(secrets_env: FakeSecrets) -> None:
     assert call(no_headers)[0] == 401
 
 
-def test_unconfigured_secret_is_503(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unconfigured_secrets_are_503(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(lambda_api, "_token_cache", None)
-    monkeypatch.delenv(lambda_api.TOKEN_SECRET_ENV, raising=False)
+    monkeypatch.delenv(lambda_api.TOKEN_SECRETS_ENV, raising=False)
     assert call(url_event())[0] == 503
 
 
 def test_secretsmanager_failure_is_503_not_open(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = FakeSecrets(TOKEN, fail=True)
     monkeypatch.setattr(lambda_api, "_token_cache", None)
-    monkeypatch.setattr("classifier.lambda_api.boto3.client", lambda service: fake)
-    monkeypatch.setenv(lambda_api.TOKEN_SECRET_ENV, SECRET_ID)
+    monkeypatch.setattr("classifier.lambda_api.boto3.client", lambda service: FakeSecrets(True))
+    monkeypatch.setenv(lambda_api.TOKEN_SECRETS_ENV, OWNER_SECRET)
     assert call(url_event())[0] == 503
 
 
-def test_token_is_fetched_once_per_environment(secrets_env: FakeSecrets) -> None:
+def test_tokens_are_fetched_once_per_environment(secrets_env: FakeSecrets) -> None:
     call(url_event(method="GET", path="/health"))
     call(url_event(method="GET", path="/health"))
-    assert secrets_env.calls == 1
+    assert secrets_env.calls == len(TOKENS), "one fetch per secret, then cached"
 
 
 def test_unknown_route_is_404(secrets_env: FakeSecrets) -> None:
@@ -138,6 +149,21 @@ def test_classify_exception_returns_human_review_not_500(
     assert status == 200
     assert payload["action"] == "human_review"
     assert payload["handoff_reason"] == "internal_error:wrapper"
+
+
+def test_token_name_is_logged_never_the_value(
+    secrets_env: FakeSecrets, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.INFO, logger="classify.lambda"):
+        call(
+            url_event(
+                body=json.dumps({"message_id": "7", "body": "Yes"}),
+                token=TOKENS[MANAGER_SECRET],
+            )
+        )
+    assert f"token={MANAGER_SECRET}" in caplog.text
+    for value in TOKENS.values():
+        assert value not in caplog.text
 
 
 def test_bodies_are_never_logged_only_their_hash(

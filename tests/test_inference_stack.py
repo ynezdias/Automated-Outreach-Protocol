@@ -7,6 +7,7 @@ from aws_cdk.assertions import Match, Template
 from infra.data_stack import DataStack
 from infra.inference_stack import (
     CLASSIFY_HANDLER,
+    CLASSIFY_MANAGER_TOKEN_SECRET_NAME,
     CLASSIFY_TOKEN_SECRET_NAME,
     SUPPRESSION_HANDLER,
     InferenceStack,
@@ -37,7 +38,7 @@ def test_post_suppressions_requires_iam_signature(template: Template) -> None:
     )
 
 
-def test_classify_lambda_reads_token_from_secrets_manager(template: Template) -> None:
+def test_classify_lambda_reads_tokens_from_secrets_manager(template: Template) -> None:
     template.has_resource_properties(
         "AWS::Lambda::Function",
         Match.object_like(
@@ -45,7 +46,9 @@ def test_classify_lambda_reads_token_from_secrets_manager(template: Template) ->
                 "Handler": CLASSIFY_HANDLER,
                 "Environment": {
                     "Variables": {
-                        "CLASSIFY_TOKEN_SECRET_ID": CLASSIFY_TOKEN_SECRET_NAME,
+                        "CLASSIFY_TOKEN_SECRET_IDS": (
+                            f"{CLASSIFY_TOKEN_SECRET_NAME},{CLASSIFY_MANAGER_TOKEN_SECRET_NAME}"
+                        ),
                         "CLASSIFY_HANDOFF_INTENTS": (
                             "Interested,Call_Request,Amount_Given,Question,Process_Update"
                         ),
@@ -54,15 +57,16 @@ def test_classify_lambda_reads_token_from_secrets_manager(template: Template) ->
             }
         ),
     )
-    template.has_resource_properties(
-        "AWS::SecretsManager::Secret",
-        Match.object_like(
-            {
-                "Name": CLASSIFY_TOKEN_SECRET_NAME,
-                "GenerateSecretString": Match.object_like({"PasswordLength": 48}),
-            }
-        ),
-    )
+    for secret_name in (CLASSIFY_TOKEN_SECRET_NAME, CLASSIFY_MANAGER_TOKEN_SECRET_NAME):
+        template.has_resource_properties(
+            "AWS::SecretsManager::Secret",
+            Match.object_like(
+                {
+                    "Name": secret_name,
+                    "GenerateSecretString": Match.object_like({"PasswordLength": 48}),
+                }
+            ),
+        )
 
 
 def test_classify_has_a_function_url_with_in_function_auth(template: Template) -> None:

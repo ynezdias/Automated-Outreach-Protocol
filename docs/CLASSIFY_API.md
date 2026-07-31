@@ -1,5 +1,40 @@
 # CLASSIFY_API.md — rules-v1 classify service, Salesforce integration handoff
 
+## Start here (no project context required)
+
+This service reads one inbound SMS reply and returns a routing decision as
+JSON: suppress the thread (opt-out), hand it to a human, or do nothing. It
+is deterministic rules — compliance guardrails plus keyword intent buckets,
+no ML model yet — and it can only *classify*: it cannot send messages and
+has no access to the CRM. Any failure inside it returns "give it to a
+human", never an error page.
+
+- **URL:** `https://ypwmkzwk6oherd3ej4nsafvibq0ghibe.lambda-url.us-east-2.on.aws`
+- **Getting a token:** every request needs `Authorization: Bearer <token>`.
+  Tokens are personal and shared out of band by the project owner
+  (ydias@fundmatellc.com) — yours is the *manager* token, revocable without
+  affecting anyone else. Tokens are never in this repo or this document.
+- **Try it** (Windows PowerShell, paste the whole block after inserting your
+  token):
+
+```powershell
+$token = "<PASTE-YOUR-TOKEN-HERE>"
+$base = "https://ypwmkzwk6oherd3ej4nsafvibq0ghibe.lambda-url.us-east-2.on.aws"
+'{"message_id": "demo-1", "body": "yes im interested", "channel": "sms"}' | Out-File -Encoding ascii body.json
+"--- health (version + rule hash):"
+curl.exe -s -H "Authorization: Bearer $token" "$base/health"
+""
+"--- classify:"
+curl.exe -s -H "Authorization: Bearer $token" -H "Content-Type: application/json" -d "@body.json" "$base/v1/classify"
+```
+
+Expected: `/health` prints the version and a rule-set hash (a fingerprint of
+the exact rules running), and the classify call prints an 8-field JSON
+response with `"action": "human_review"` and `"intent": "Interested"`.
+Everything below is the full contract.
+
+---
+
 Documentation for the deployed reply-classification API (ADR-023). The service
 classifies one inbound reply and returns a routing decision. It never sends
 messages, has no Salesforce access, and its deployed package contains no send
@@ -11,10 +46,16 @@ for that work.
   (CloudFormation output `OutreachInferenceStack.ClassifyUrl`; re-read it if
   the stack is ever recreated.)
 - **Auth:** `Authorization: Bearer <token>` on **every** request, `/health`
-  included. The token is **not in this document**. It lives in AWS Secrets
-  Manager as `outreach/classify/token` (us-east-2) and is shared out of band.
-  In Salesforce it belongs inside a Named/External Credential — never in code,
-  Custom Settings, or Custom Metadata (CLAUDE.md anti-goal).
+  included. Token values are **not in this document**. Two independently
+  revocable tokens exist in AWS Secrets Manager (us-east-2), shared out of
+  band: `outreach/classify/token` (owner) and
+  `outreach/classify/token-manager` (manager). Either authenticates; the
+  service logs which one was used by secret NAME on every request, never by
+  value — so each caller's traffic is distinguishable and one credential can
+  be revoked (delete/rotate its secret, next cold start applies it) without
+  breaking the other. In Salesforce the token belongs inside a Named/External
+  Credential — never in code, Custom Settings, or Custom Metadata (CLAUDE.md
+  anti-goal).
 - **Transport note:** today's auth is bearer over a Lambda Function URL
   (ADR-023). The architecture's settled Salesforce→AWS pattern is a SigV4
   Named Credential against API Gateway; decide which one production wiring

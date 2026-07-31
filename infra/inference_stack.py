@@ -27,6 +27,7 @@ from infra.layers import dependencies_layer
 SUPPRESSION_HANDLER = "suppression.api.handler"
 CLASSIFY_HANDLER = "classifier.lambda_api.handler"
 CLASSIFY_TOKEN_SECRET_NAME = "outreach/classify/token"  # pragma: allowlist secret
+CLASSIFY_MANAGER_TOKEN_SECRET_NAME = "outreach/classify/token-manager"  # pragma: allowlist secret
 DEFAULT_HANDOFF_INTENTS = "Interested,Call_Request,Amount_Given,Question,Process_Update"
 
 _SRC_PATH = str(Path(__file__).resolve().parent.parent / "src")
@@ -102,7 +103,19 @@ class InferenceStack(Stack):
             self,
             "ClassifyToken",
             secret_name=CLASSIFY_TOKEN_SECRET_NAME,
-            description="Bearer token for the rules-v1 classify Function URL",
+            description="Bearer token for the rules-v1 classify Function URL (owner)",
+            generate_secret_string=secretsmanager.SecretStringGenerator(
+                password_length=48, exclude_punctuation=True
+            ),
+        )
+        # A second, independently revocable credential: the manager's traffic
+        # is distinguishable in logs (by secret name) and can be cut off
+        # without rotating the owner token.
+        manager_token = secretsmanager.Secret(
+            self,
+            "ClassifyManagerToken",
+            secret_name=CLASSIFY_MANAGER_TOKEN_SECRET_NAME,
+            description="Bearer token for the rules-v1 classify Function URL (manager)",
             generate_secret_string=secretsmanager.SecretStringGenerator(
                 password_length=48, exclude_punctuation=True
             ),
@@ -118,12 +131,15 @@ class InferenceStack(Stack):
             timeout=Duration.seconds(10),
             memory_size=256,
             environment={
-                "CLASSIFY_TOKEN_SECRET_ID": CLASSIFY_TOKEN_SECRET_NAME,
+                "CLASSIFY_TOKEN_SECRET_IDS": (
+                    f"{CLASSIFY_TOKEN_SECRET_NAME},{CLASSIFY_MANAGER_TOKEN_SECRET_NAME}"
+                ),
                 # Handoff list changes without a redeploy: edit this env var.
                 "CLASSIFY_HANDOFF_INTENTS": DEFAULT_HANDOFF_INTENTS,
             },
         )
         classify_token.grant_read(classify_fn)
+        manager_token.grant_read(classify_fn)
         classify_url = classify_fn.add_function_url(
             auth_type=lambda_.FunctionUrlAuthType.NONE  # bearer auth is in-function
         )
