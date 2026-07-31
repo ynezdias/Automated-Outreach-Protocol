@@ -31,7 +31,7 @@ NO_ACTION = "no_action"
 
 HANDOFF_ENV = "CLASSIFY_HANDOFF_INTENTS"
 DEFAULT_HANDOFF_INTENTS = frozenset(
-    {"Interested", "Call_Request", "Amount_Given", "Question", "Process_Update"}
+    {"Interested", "Call_Request", "Amount_Given", "Question", "Process_Update", "Unclear"}
 )
 
 _RULE_SOURCES = (

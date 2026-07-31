@@ -28,7 +28,7 @@ SUPPRESSION_HANDLER = "suppression.api.handler"
 CLASSIFY_HANDLER = "classifier.lambda_api.handler"
 CLASSIFY_TOKEN_SECRET_NAME = "outreach/classify/token"  # pragma: allowlist secret
 CLASSIFY_MANAGER_TOKEN_SECRET_NAME = "outreach/classify/token-manager"  # pragma: allowlist secret
-DEFAULT_HANDOFF_INTENTS = "Interested,Call_Request,Amount_Given,Question,Process_Update"
+DEFAULT_HANDOFF_INTENTS = "Interested,Call_Request,Amount_Given,Question,Process_Update,Unclear"
 
 _SRC_PATH = str(Path(__file__).resolve().parent.parent / "src")
 
@@ -130,6 +130,9 @@ class InferenceStack(Stack):
             handler=CLASSIFY_HANDLER,
             timeout=Duration.seconds(10),
             memory_size=256,
+            # The Function URL is a public address; the bearer token protects
+            # the data, not the invocation count. Cap the blast radius.
+            reserved_concurrent_executions=10,
             environment={
                 "CLASSIFY_TOKEN_SECRET_IDS": (
                     f"{CLASSIFY_TOKEN_SECRET_NAME},{CLASSIFY_MANAGER_TOKEN_SECRET_NAME}"

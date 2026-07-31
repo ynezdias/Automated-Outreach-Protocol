@@ -44,13 +44,14 @@ def test_classify_lambda_reads_tokens_from_secrets_manager(template: Template) -
         Match.object_like(
             {
                 "Handler": CLASSIFY_HANDLER,
+                "ReservedConcurrentExecutions": 10,
                 "Environment": {
                     "Variables": {
                         "CLASSIFY_TOKEN_SECRET_IDS": (
                             f"{CLASSIFY_TOKEN_SECRET_NAME},{CLASSIFY_MANAGER_TOKEN_SECRET_NAME}"
                         ),
                         "CLASSIFY_HANDOFF_INTENTS": (
-                            "Interested,Call_Request,Amount_Given,Question,Process_Update"
+                            "Interested,Call_Request,Amount_Given,Question,Process_Update,Unclear"
                         ),
                     }
                 },

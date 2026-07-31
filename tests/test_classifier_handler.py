@@ -97,6 +97,18 @@ def test_interested_phrase_routes_to_handoff() -> None:
     assert response["intent"] == "Interested"
 
 
+def test_unclear_hands_off_by_default() -> None:
+    # Pilot finding: free-text replies ("tell me about your rates") fell to
+    # Unclear -> no_action and were dropped. Until the trained classifier
+    # exists, Unclear routes to a human by default.
+    response = classify(request("tell me about your rates"))
+    assert_contract(response)
+    assert response["action"] == "human_review"
+    assert response["intent"] == "Unclear"
+    assert response["handoff_reason"] is not None
+    assert response["handoff_reason"].startswith("handoff intent Unclear")
+
+
 def test_process_update_hands_off_by_default() -> None:
     # 859 unique observed (2nd-largest bucket): "what's the status" must reach
     # a rep, not fall through to no_action.
