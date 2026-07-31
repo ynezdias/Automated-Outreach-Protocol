@@ -32,7 +32,8 @@ human", never an error page.
   token):
 
 ```powershell
-$token = "<PASTE-YOUR-TOKEN-HERE>"
+$token = "<PASTE-YOUR-TOKEN-HERE>".Trim()
+if ($token.Length -ne 48) { throw "Token is $($token.Length) chars, expected 48 - re-copy it as ONE line, no spaces." }
 $base = "https://ypwmkzwk6oherd3ej4nsafvibq0ghibe.lambda-url.us-east-2.on.aws"
 '{"message_id": "demo-1", "body": "yes im interested", "channel": "sms"}' | Out-File -Encoding ascii body.json
 "--- health (version + rule hash):"
@@ -45,6 +46,14 @@ curl.exe -s -H "Authorization: Bearer $token" -H "Content-Type: application/json
 Expected: `/health` prints the version and a rule-set hash (a fingerprint of
 the exact rules running), and the classify call prints an 8-field JSON
 response with `"action": "human_review"` and `"intent": "Interested"`.
+
+**If you get a 401:** the token did not arrive intact or is not current.
+The `.Trim()` + length check above catch pastes with stray whitespace or a
+line break (terminals often hard-wrap long values on copy); if the length
+check passes and you still get 401, your token value is stale — ask the
+project owner to re-share it. This block was dry-run verified exactly as
+written on 2026-07-31 against the live URL.
+
 Everything below is the full contract.
 
 ---
