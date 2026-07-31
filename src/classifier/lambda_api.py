@@ -31,6 +31,9 @@ import boto3
 from classifier.handler import MODEL_VERSION, classify, fail_closed, rule_set_hash
 
 logger = logging.getLogger("classify.lambda")
+# The Lambda runtime's root logger defaults to WARNING; without this, the
+# per-request token-name and body-hash INFO lines never reach CloudWatch.
+logger.setLevel(logging.INFO)
 
 TOKEN_SECRETS_ENV = "CLASSIFY_TOKEN_SECRET_IDS"
 _token_cache: dict[str, str] | None = None
