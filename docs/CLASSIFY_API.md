@@ -1,5 +1,19 @@
 # CLASSIFY_API.md — rules-v1 classify service, Salesforce integration handoff
 
+## Scope — read this first
+
+- **This service classifies inbound message text and returns a verdict.
+  That is all it does.**
+- It does **not** send messages, receive messages, or perform the handoff.
+- **Acting on the verdict is Salesforce's job, and that integration is not
+  built yet.** Nothing happens to a lead, thread, or queue because this API
+  returned something — until the Salesforce side exists and calls it.
+- **Auth is a bearer token for now, but SigV4 via Named Credential is the
+  settled Salesforce→AWS architecture** (CLAUDE.md; ADR-023 deliberately
+  left the migration open). **Do not write production Apex against bearer
+  auth until that decision is made.** The Apex sample below is the shape of
+  the callout, not a green light on the auth scheme.
+
 ## Start here (no project context required)
 
 This service reads one inbound SMS reply and returns a routing decision as
@@ -224,7 +238,7 @@ mirror.
   effective handoff configuration: **two instances with the same hash run
   identical rules.** That is how staging and prod are told apart, and how a
   config drift shows up. Current dev deployment:
-  `bcc263eb52b440469c16b58fdea309c2ed76b4a7030a106c4fab1e8ba496698c` <!-- pragma: allowlist secret -->
+  `d23b5507a6fccabd5e1054d3f53ca845d48d3f829422412a9401f4f58856979a` <!-- pragma: allowlist secret -->
   (changes on any rules or handoff-config change — compare, don't pin).
 - **Privacy:** message bodies never appear in service logs — only their
   SHA-256, the message id, and the resulting action/intent/rule.
