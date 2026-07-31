@@ -967,3 +967,14 @@ holding the URL can *reach* the function (auth is in-function), so the
 bearer check runs first on every path, including /health. The adapter
 (`classifier/lambda_api.py`) mirrors research/serve_local.py: SHA-256-only
 logging, fail-closed 200s. Bodies never hit CloudWatch.
+
+### Update (2026-07-31, Interested bucket)
+
+- The Interested bucket now also matches any message containing
+  `interested` that did not already match the decline check, which runs
+  first (`yes im interested` previously fell to Unclear -> no_action, the
+  same failure class as the Process_Update gap). Decline phrasing still
+  wins: `not interested at all` stays Not_Interested. Rule-set hash
+  changed accordingly.
+- The Part D voice-analysis interest-per-send rates were computed with the
+  narrower pre-change bucket: treat them as lower bounds.

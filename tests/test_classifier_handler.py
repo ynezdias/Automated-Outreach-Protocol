@@ -88,6 +88,15 @@ def test_handoff_human_review_shape() -> None:
     assert response["handoff_reason"].startswith("handoff intent Question")
 
 
+def test_interested_phrase_routes_to_handoff() -> None:
+    # Previously fell to Unclear/no_action — the exact failure class of the
+    # Process_Update gap, pinned here after the approved bucket widening.
+    response = classify(request("yes im interested"))
+    assert_contract(response)
+    assert response["action"] == "human_review"
+    assert response["intent"] == "Interested"
+
+
 def test_process_update_hands_off_by_default() -> None:
     # 859 unique observed (2nd-largest bucket): "what's the status" must reach
     # a rep, not fall through to no_action.
@@ -231,6 +240,12 @@ BUCKET_CASES = [
     ("We are already funded for the year", "Not_Interested"),
     ("we have funding", "Not_Interested"),
     ("not interested at all", "Not_Interested"),
+    ("not interested", "Not_Interested"),
+    ("im not interested thanks", "Not_Interested"),
+    ("yes im interested", "Interested"),
+    ("im interested", "Interested"),
+    ("interested", "Interested"),
+    ("very interested", "Interested"),
     ("you have the wrong number", "Wrong_Person"),
     ("", "Unclear"),
     ("Stop by our office next week", "Unclear"),

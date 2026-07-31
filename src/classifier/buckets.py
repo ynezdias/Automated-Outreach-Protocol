@@ -99,6 +99,8 @@ def bucket_intent(body: str, guardrail: GuardrailResult) -> tuple[str, str]:
         or "we have funding" in text
     ):
         return "Not_Interested", "decline phrasing"
+    if "interested" in text:  # the decline check above already caught "not interested"
+        return "Interested", "contains 'interested' with no decline phrasing"
     for keyword in WRONG_KEYWORDS:
         if keyword in text:
             return "Wrong_Person", f"keyword: {keyword!r}"
