@@ -18,6 +18,8 @@ dev = [
     "aws-cdk-lib>=2.170",
     "constructs>=10.0",
     "detect-secrets>=1.5",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "moto[s3]>=5.0 ; platform_machine != 'ARM64'",
     "mypy>=1.13",
     "nodejs-wheel-binaries>=24.16.0",
@@ -25,6 +27,7 @@ dev = [
     "pytest>=8.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.8",
+    "uvicorn>=0.52.0",
 ]
 
 [tool.uv]
@@ -46,7 +49,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 strict = true
 files = ["infra", "src", "tests"]
-mypy_path = "src"
+mypy_path = ["src", "research"]
 
 [[tool.mypy.overrides]]
 module = ["boto3.*", "botocore.*", "moto", "moto.*"]
@@ -54,5 +57,5 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "src"]
+pythonpath = [".", "src", "research"]
 addopts = "--cov=src --cov-branch --cov-report=term-missing --cov-fail-under=100"
