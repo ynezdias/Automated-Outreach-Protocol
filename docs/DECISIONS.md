@@ -919,3 +919,51 @@ real vendor limits are now known (ADR-017 update): 500 API requests/min,
 Throughput scales to the vendor cap by turning one dial, with every
 compliance gate untouched and test-pinned inside the batch. The org needs a
 one-time `OutreachSendScheduler.scheduleHourly()` registration (runbook).
+
+---
+
+## ADR-023: Classify service deployment — Function URL, in-function bearer auth
+
+- **Date:** 2026-07-31
+- **Status:** Accepted
+
+### Context
+
+The rules-v1 classify service (guardrails + TAXONOMY.md buckets, no trained
+model) needs a stable HTTPS URL in the dev account. It is rules-only — no
+heavy dependencies, so a plain zip suffices — and it must never send
+messages or touch Salesforce. The work order left Function URL vs API
+Gateway open, required the bearer token in Secrets Manager (not an env
+var), and the handoff-intent list changeable without a redeploy.
+
+### Decision
+
+- **Lambda Function URL over API Gateway.** Auth is app-level bearer either
+  way, so API Gateway adds cost and moving parts without adding control; a
+  Function URL is one construct and a stable HTTPS URL. `AuthType: NONE` at
+  the URL, with auth enforced in-function on every request (401 without a
+  valid token, 503 if the token secret is unreachable — fail closed, never
+  open). Revisit if the future Salesforce->classify callout wants the
+  existing IAM-SigV4 API Gateway pattern instead (ADR-017 §sync callout);
+  nothing here precludes moving.
+- **Token generated server-side** by Secrets Manager
+  (`outreach/classify/token`, 48 chars, `GenerateSecretString`): it never
+  appears in code, template, terminal, or CDK context. The function caches
+  it per execution environment; rotation lands on the next cold start.
+- **The asset ships only `classifier/` + `guardrails/`** — the send path
+  (`texttorrent/`), Salesforce clients, and pipeline code are excluded from
+  the zip, and the role reads exactly one secret. "No send capability" is
+  enforced by what is deployed, not by convention.
+- **`CLASSIFY_HANDOFF_INTENTS` is a plain env var** (comma list), so the
+  handoff set changes without a redeploy. It participates in the /health
+  rule-set hash, so instances with different lists are distinguishable.
+- **No provisioned concurrency**; cold starts are acceptable at zero
+  traffic.
+
+### Consequences
+
+A stable HTTPS endpoint with one secret, one function, no gateway. Anyone
+holding the URL can *reach* the function (auth is in-function), so the
+bearer check runs first on every path, including /health. The adapter
+(`classifier/lambda_api.py`) mirrors research/serve_local.py: SHA-256-only
+logging, fail-closed 200s. Bodies never hit CloudWatch.
