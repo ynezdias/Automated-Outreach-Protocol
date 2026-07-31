@@ -27,7 +27,7 @@ from infra.layers import dependencies_layer
 SUPPRESSION_HANDLER = "suppression.api.handler"
 CLASSIFY_HANDLER = "classifier.lambda_api.handler"
 CLASSIFY_TOKEN_SECRET_NAME = "outreach/classify/token"  # pragma: allowlist secret
-DEFAULT_HANDOFF_INTENTS = "Interested,Call_Request,Amount_Given,Question"
+DEFAULT_HANDOFF_INTENTS = "Interested,Call_Request,Amount_Given,Question,Process_Update"
 
 _SRC_PATH = str(Path(__file__).resolve().parent.parent / "src")
 

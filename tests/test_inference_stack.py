@@ -47,7 +47,7 @@ def test_classify_lambda_reads_token_from_secrets_manager(template: Template) ->
                     "Variables": {
                         "CLASSIFY_TOKEN_SECRET_ID": CLASSIFY_TOKEN_SECRET_NAME,
                         "CLASSIFY_HANDOFF_INTENTS": (
-                            "Interested,Call_Request,Amount_Given,Question"
+                            "Interested,Call_Request,Amount_Given,Question,Process_Update"
                         ),
                     }
                 },

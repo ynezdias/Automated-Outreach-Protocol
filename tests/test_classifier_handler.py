@@ -88,6 +88,17 @@ def test_handoff_human_review_shape() -> None:
     assert response["handoff_reason"].startswith("handoff intent Question")
 
 
+def test_process_update_hands_off_by_default() -> None:
+    # 859 unique observed (2nd-largest bucket): "what's the status" must reach
+    # a rep, not fall through to no_action.
+    response = classify(request("just sent the statements over"))
+    assert_contract(response)
+    assert response["action"] == "human_review"
+    assert response["intent"] == "Process_Update"
+    assert response["handoff_reason"] is not None
+    assert response["handoff_reason"].startswith("handoff intent Process_Update")
+
+
 def test_no_action_shape() -> None:
     # Not_Interested is auto-reply ELIGIBLE per TAXONOMY.md §5 — and still gets
     # no_action: nothing may return auto_reply until approved templates exist.

@@ -30,7 +30,9 @@ ACTIONS = ("suppress_and_stop", "human_review", "auto_reply", "no_action")
 NO_ACTION = "no_action"
 
 HANDOFF_ENV = "CLASSIFY_HANDOFF_INTENTS"
-DEFAULT_HANDOFF_INTENTS = frozenset({"Interested", "Call_Request", "Amount_Given", "Question"})
+DEFAULT_HANDOFF_INTENTS = frozenset(
+    {"Interested", "Call_Request", "Amount_Given", "Question", "Process_Update"}
+)
 
 _RULE_SOURCES = (
     Path(__file__).resolve().parent.parent / "guardrails" / "rules.py",
